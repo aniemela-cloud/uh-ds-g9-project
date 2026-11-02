@@ -1,7 +1,7 @@
 # uh-ds-g9-project
 Repository for Uni of Helsinki Distributed Systems 2026 project g9
 
-##Project description
+## Project description
 This project implements an OSPF-inspired designated router mechanism. 
 
 Routers exchange Hello messages to discover neighbors, verify 
