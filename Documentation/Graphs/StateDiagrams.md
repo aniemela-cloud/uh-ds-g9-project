@@ -1,6 +1,6 @@
 # State Diagrams Used By The Nodes
 
-## Interface State Diagram
+## Interface States
 
 The state diagram describes the states a network interface can be in.
 
@@ -226,3 +226,121 @@ what the current interface state is, the new interface state will be Down.
 > **Action:** No actions are necessary.  For example, the interface variables have
 > already been reset upon entering the **Loopback** state. Note that reception of an
 > InterfaceUp event is necessary before the interface again becomes fully functional.
+
+## Neighbor States
+
+The diagram describes the states a neighbor (or the state of a conversation being
+held with a neighboring router) can have and their transitions. The states are 
+considered to be ordered according to progressive functionality. When documentation
+refers to a neighbor's state being "greater than" or "less than" something, refer to
+the order the events are listed in the section **Descriptions of Neighbor States**.
+
+```mermaid
+---
+title: Neighbor State Diagram (Hello Protocol)
+---
+stateDiagram-v2
+    state "2-Way" as 2Way
+    state select <<choice>>
+    [*] --> Down
+    Down --> Attempt : Start
+    Down --> Init : HelloReceived
+    Attempt --> Init: HelloReceived
+    Init --> select : 2-Way Received
+    select --> ExStart
+    select --> 2Way
+    2Way --> Init : 1-Way received
+```
+_In addition to the state transitions pictured, Event KillNbr always forces Down
+State, Event InactivityTimer always forces Down State, Event LLDown always forces
+Down State_
+
+Additionally, the **ExStart** state leads to the Neighbor States of the database
+exchange process performed when neighbors count as adjacent. _(Note that this means
+a neighbor is considered adjacent when it's state is one of the states shown in the
+diagram below. --Antti)_
+
+```mermaid
+---
+title: Neighbor State Diagram (Database Exchange)
+---
+stateDiagram-v2
+    state ex_select <<choice>>
+    [*] --> ExStart
+    ExStart --> Exchange : NegotiationDone
+    Exchange --> ex_select : ExchangeDone
+    ex_select --> Full
+    ex_select --> Loading
+    Loading --> Full : LoadingDone    
+```
+_In addition to the state transitions pictured,_
+- _Event SeqNumberMismatch forces ExStart state,_
+- _Event BadLSReq forces ExStart state,_
+- _Event 1-Way forces Init state,_
+- _Event KillNbr always forces Down State,_
+- _Event InactivityTimer always forces Down State,_
+- _Event LLDown always forces Down State,_
+- _Event AdjOK? leads to adjacency forming/breaking_
+  
+### Descriptions of Neighbor States
+
+_(Paraphrased or copied from RFC2328 Section 9.1)_
+
+#### Down
+
+This is the initial state of a neighbor conversation.  It indicates that there has
+been no recent information received from the neighbor.  On NBMA networks, Hello 
+packets may still be sent to "Down" neighbors, although at a reduced frequency (see 
+RFC2328 Section 9.5.1).
+
+#### Attempt
+
+This state is only valid for neighbors attached to NBMA networks.  It indicates that
+no recent information has been received from the neighbor, but that a more concerted 
+effort should be made to contact the neighbor.  This is done by sending the neighbor 
+Hello packets at intervals of HelloInterval (see RFC2328 Section 9.5.1).
+
+#### Init
+
+In this state, an Hello packet has recently been seen from the neighbor.  However,
+bidirectional communication has not yet been established with the neighbor (i.e., the
+router itself did not appear in the neighbor's Hello packet).  All neighbors in this 
+state (or higher) are listed in the Hello packets sent from the associated interface.
+
+#### 2-Way
+
+In this state, communication between the two routers is bidirectional.  This has been
+assured by the operation of the Hello Protocol.  This is the most advanced state short
+of beginning adjacency establishment.  The (Backup) Designated Router is selected from
+the set of neighbors in state 2-Way or greater. 
+
+#### ExStart
+
+This is the first step in creating an adjacency between the two neighboring routers.
+The goal of this step is to decide which router is the master, and to decide upon the 
+initial DD sequence number.  Neighbor conversations in this state or greater are called
+adjacencies.
+
+#### Exchange
+
+In this state the router is describing its entire link state database by sending
+Database Description packets to the neighbor.  Each Database Description Packet has a
+DD sequence number, and is explicitly acknowledged.  Only one Database Description 
+Packet is allowed outstanding at any one time.  In this state, Link State Request
+Packets may also be sent asking for the neighbor's more recent LSAs. All adjacencies
+in Exchange state or greater are used by the flooding procedure.  In fact, these a
+djacencies are fully capable of transmitting and receiving all types of OSPF 
+routing protocol packets.
+
+#### Loading
+
+In this state, Link State Request packets are sent to the neighbor asking for the 
+more recent LSAs that have been discovered (but not yet received) in the Exchange 
+state.
+
+#### Full
+
+In this state, the neighboring routers are fully adjacent. These adjacencies 
+will now appear in router-LSAs and network-LSAs.
+
+
