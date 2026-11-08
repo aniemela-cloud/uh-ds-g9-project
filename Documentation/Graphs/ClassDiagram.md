@@ -10,7 +10,7 @@ classDiagram
   }
   class NetworkInterface {
     -Enum interface_type
-    -Enum state
+    -InterfaceState state
     -Integer ip_version
     -IPAddress ip_address
     -IPAddress ip_mask
@@ -53,12 +53,40 @@ classDiagram
     -hello_received()
     -start() // can leave unimplemented, for NBMA
     -two_way_received()
+    -one_way_received()
+    -kill_neighbor()
+    -inactivity_timer_triggered()
+    -lower_level_down_received()
+    -adjacency_ok_check()
+    -sequence_number_mismatch() // leave as stub for now
+    -bad_link_state_request() // leave as stub for now
     -negotiation_done() // leave as stub for now
     -exchange_done() // leave as stub for now
     -loading_done() // leave as stub for now
   }
+  class InterfaceState <<enumeration>> {
+    Down = 0
+    Loopback = 1
+    Point_to_point = 2
+    Waiting = 3
+    DR_other = 4
+    Backup = 5
+    DR = 6
+  }
+  class NeighborState <<enumeration>> {
+    Down = 0
+    Attempt = 1
+    Init = 2
+    Two_Way = 3
+    ExStart = 4
+    Exchange = 5
+    Loading = 6
+    Full = 7
+  }
   RouterNode "1" --> "*" NetworkInterface : has
+  NetworkInterface --> "1" InterfaceState : has
   NetworkInterface "1" --> "*" Neighbor : connects to
+  Neighbor --> "1" NeighborState : has
 
 ```
 
