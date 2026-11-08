@@ -37,7 +37,7 @@ classDiagram
     -receive_hello()
   }
   class Neighbor {
-    -Enum state
+    -NeighborState state
     -Timer inactivity_timer
     -Enum master_slave
     -Integer dd_sequence_number
@@ -84,9 +84,24 @@ classDiagram
     Full = 7
   }
   RouterNode "1" --> "*" NetworkInterface : has
-  NetworkInterface --> "1" InterfaceState : has
+  NetworkInterface ..> "1" InterfaceState : has
   NetworkInterface "1" --> "*" Neighbor : connects to
-  Neighbor --> "1" NeighborState : has
+  Neighbor ..> "1" NeighborState : has
+
+  class RouterEvent {
+
+  }
+  class InterfaceEvent {
+
+  }
+  class NeighborEvent {
+
+  }
+  RouterEvent <|-- InterfaceEvent
+  RouterEvent <|-- NeighborEvent
+  NetworkInterface ..> InterfaceEvent : receives and sends
+  NetworkInterface ..> NeighborEvent : sends
+  Neighbor ..> NeighborEvent : receives and sends
 
 ```
 
