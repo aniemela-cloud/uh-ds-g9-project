@@ -20,7 +20,7 @@ stateDiagram-v2
     Down --> ptp_or_multicast : InterfaceUp
     ptp_or_multicast --> Multicast : Multicast
     ptp_or_multicast --> ptp : Point-to-point
-    state "Mulicast operation" as Multicast {
+    state "Multicast operation" as Multicast {
         [*] --> Waiting
         Waiting --> select : WaitTimer / BackupSeen
 %%    select --> fork_state
