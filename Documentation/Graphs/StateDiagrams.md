@@ -146,7 +146,7 @@ lower level protocols.
 Lower-level protocols indicate that this interface is no longer functional.  No matter 
 what the current interface state is, the new interface state will be Down.
 
-### Detailed Description of State Changes
+### Detailed Description of Interface State Changes
 
 #### State: Down
 
@@ -249,7 +249,7 @@ stateDiagram-v2
     Init --> select : 2-Way Received
     select --> ExStart
     select --> 2Way
-    2Way --> Init : 1-Way received
+    2Way --> Init : 1-Way Received
 ```
 _In addition to the state transitions pictured, Event KillNbr always forces Down
 State, Event InactivityTimer always forces Down State, Event LLDown always forces
@@ -276,7 +276,7 @@ stateDiagram-v2
 _In addition to the state transitions pictured,_
 - _Event SeqNumberMismatch forces ExStart state,_
 - _Event BadLSReq forces ExStart state,_
-- _Event 1-Way forces Init state,_
+- _Event 1-WayReceived forces Init state,_
 - _Event KillNbr always forces Down State,_
 - _Event InactivityTimer always forces Down State,_
 - _Event LLDown always forces Down State,_
@@ -343,4 +343,272 @@ state.
 In this state, the neighboring routers are fully adjacent. These adjacencies 
 will now appear in router-LSAs and network-LSAs.
 
+### Events Causing Neighbor State Changes
 
+#### HelloReceived
+
+An Hello packet has been received from the neighbor.
+
+#### Start
+
+This is an indication that Hello Packets should now be sent to the neighbor at
+intervals of HelloInterval seconds.  This event is generated only for neighbors
+associated with NBMA networks.
+
+#### 2-WayReceived
+
+Bidirectional communication has been realized between the two neighboring 
+routers.  This is indicated by the router seeing itself in the neighbor's Hello
+packet.
+
+#### NegotiationDone
+
+The Master/Slave relationship has been negotiated, and DD sequence numbers have
+been exchanged.  This signals the start of the sending/receiving of Database 
+Description packets.  For more information on the generation of this event, 
+consult RFC 2328 Section 10.6.
+
+#### ExchangeDone
+
+Both routers have successfully transmitted a full sequence of Database 
+Description packets.  Each router now knows what parts of its link state 
+database are out of date.  For more information on the generation of this 
+event, consult RFC 2328 Section 10.8.
+
+#### BadLSReq
+
+A Link State Request has been received for an LSA not contained in the 
+database.  This indicates an error in the Database Exchange process.
+
+#### LoadingDone
+
+Link State Updates have been received for all out-of-date portions of the 
+database.  This is indicated by the Link state request list becoming empty 
+after the Database Exchange process has completed. 
+
+#### AdjOk?
+
+A decision must be made as to whether an adjacency should be 
+established/maintained with the neighbor.  This event will start some 
+adjacencies forming, and destroy others. 
+
+_The following events cause well developed neighbors to revert to lesser 
+states.  Unlike the above events, these events may occur when the neighbor
+conversation is in any of a number of states._
+
+#### SeqNumberMismatch
+
+A Database Description packet has been received that either 
+1. has an unexpected DD sequence number, 
+2. unexpectedly has the Init bit set or 
+3. has an Options field differing from the last Options field received in a 
+Database Description packet.
+
+Any of these conditions indicate that some error has occurred during adjacency
+establishment.
+
+#### 1-WayReceived
+
+An Hello packet has been received from the neighbor, in which the router is not
+mentioned.  This indicates that communication with the neighbor is not 
+bidirectional.
+
+#### KillNbr
+
+This is an indication that all communication with the neighbor is now 
+impossible, forcing the neighbor to revert  to Down state.
+
+#### InactivityTimer
+
+The inactivity Timer has fired.  This means that no Hello packets have been 
+seen recently from the neighbor.  The neighbor reverts to Down state.
+
+#### LLDown
+
+This is an indication from the lower level protocols that the neighbor is now
+unreachable.  For example, on an X.25 network this could be indicated by an
+X.25 clear indication with appropriate cause and diagnostic fields.  This event
+forces the neighbor into Down state.
+
+### Detailed Description of Neighbor State Changes
+
+#### State: Down
+
+> ##### Event: Start
+>
+> **New State:** Attempt
+>
+> **Action:** Send an Hello Packet to the neighbor (this neighbor is always 
+> associated with an NBMA network) and start the Inactivity Timer for the
+> neighbor.  The timer's later firing would indicate that communication 
+> with the neighbor was not attained.
+
+#### State: Attempt
+
+> ##### Event: HelloReceived
+> 
+> **New State:** Init
+>
+> **Action:** Restart the Inactivity Timer for the neighbor, since
+> the neighbor has now been heard from.
+
+#### State: Down
+
+> ##### Event: HelloReceived
+> 
+> **New State:** Init
+>
+> **Action:** Restart the Inactivity Timer for the neighbor. The
+> timer's later firing would indicate that the neighbor is dead.
+
+#### States: Init or Greater
+
+> ##### Event: HelloReceived
+>
+> **New State:** No state change.
+>
+> **Action:** Restart the Inactivity Timer for the neighbor, since
+> the neighbor has again been heard from.
+
+#### State: Init
+
+> ##### Event: 2-WayReceived
+>
+> **New State:** Depends upon action routine.
+>
+> **Action:** Determine whether an adjacency should be established
+> with the neighbor (see RFC2328 Section 10.4).  If not, the
+> new neighbor state is **2-Way**.
+>
+> If an adjacency should be established, the neighbor state transitions
+> to **ExStart**. Upon entering this state, the router increments the DD
+> sequence number in the neighbor data structure.  If this is the first time
+> that an adjacency has been attempted, the DD sequence number should be
+> assigned some unique value (like the time of day clock).  It then declares
+> itself master (sets the master/slave bit to master), and starts sending
+> Database Description Packets, with the initialize (I), more (M) and
+> master (MS) bits set.  This Database Description Packet should be otherwise
+> empty.  This Database Description Packet should be retransmitted at
+> intervals of RxmtInterval until the next state is entered
+> (see RFC 2328 Section 10.8).
+
+
+#### State: ExStart
+
+> ##### Event: NegotiationDone
+>
+> **New State:** Exchange
+>
+> **Action:** Out of scope for this project, details found in
+> [RFC 2328 Section 10.3 p.91](https://www.rfc-editor.org/info/rfc2328/#page-91)
+
+#### State: Exchange
+
+> ##### Event: ExchangeDone
+>
+> **New State:** Depends upon action routine.
+>
+> **Action:**  Out of scope for this project, details found in
+> [RFC 2328 Section 10.3 p.92](https://www.rfc-editor.org/info/rfc2328/#page-92)
+
+#### State: Loading
+
+> ##### Event: LoadingDone
+>
+> **New State:** Full
+>
+> **Action:** No action required. This is an adjacency's final state.
+
+#### State: 2-Way
+
+> ##### Event: AdjOk?
+>
+> **New State:** Depends upon action routine.
+>
+> **Action:**  Determine whether an adjacency should be formed with the neighboring router
+> (see [RFC2328 Section 10.4 p.95](https://www.rfc-editor.org/info/rfc2328/#page-95)).  If not,
+> the neighbor state remains at 2-Way.
+> Otherwise, transition the neighbor state to ExStart and perform the actions
+> associated with the above state machine entry for state Init and event
+> 2-WayReceived.
+
+#### States: ExStart or greater
+
+> ##### Event: AdjOk?
+>
+> **New State:** Depends upon action routine.
+>
+> **Action:** Determine whether the neighboring router should still be adjacent.
+> If yes, there is no state change and no further action is necessary.
+> 
+> Otherwise, the (possibly partially formed) adjacency must be destroyed.  The
+> neighbor state transitions to 2-Way.  The Link state retransmission list,
+> Database summary list and Link state request list are cleared of LSAs.
+
+#### States: Exchange or greater
+
+> ##### Event: SeqNumberMismatch
+>
+> **New State:** ExStart
+>
+> **Action:** Out of scope for this project, details found in
+> [RFC 2328 Section 10.3 p.93](https://www.rfc-editor.org/info/rfc2328/#page-93)
+
+#### States: Exchange or greater
+
+> ##### Event: BadLSReq
+>
+> **New State:** ExStart
+>
+> **Action:** Out of scope for this project, details found in
+> [RFC 2328 Section 10.3 p.93](https://www.rfc-editor.org/info/rfc2328/#page-93)
+
+#### States: Any state
+
+> ##### Event: KillNbr
+>
+> **New State:** Down
+>
+> **Action:** The Link state retransmission list, Database summary list and
+> Link state request list are cleared of LSAs.  Also, the Inactivity
+> Timer is disabled.
+
+> ##### Event: LLDown
+>
+> **New State:** Down
+>
+> **Action:** The Link state retransmission list, Database summary list and
+> Link state request list are cleared of LSAs.  Also, the Inactivity
+> Timer is disabled.
+
+> ##### Event: InactivityTimer
+>
+> **New State:** Down
+>
+> **Action:** The Link state retransmission list, Database summary list and
+> Link state request list are cleared of LSAs.  Also, the Inactivity
+> Timer is disabled.
+
+#### State: 2-Way or Greater
+
+> ##### Event: 1-WayReveived
+>
+> **New State:** Init
+>
+> **Action:** The Link state retransmission list, Database summary list and
+> Link state request list are cleared of LSAs.  Also, the Inactivity
+> Timer is disabled.
+
+> ##### Event: 2-WayReveived
+>
+> **New State:** No state change.
+>
+> **Action:** No action required.
+
+#### State: Init
+
+> ##### Event: 1-WayReveived
+>
+> **New State:** No state change.
+>
+> **Action:** No action required.
