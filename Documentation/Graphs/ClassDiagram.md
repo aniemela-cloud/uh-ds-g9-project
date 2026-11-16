@@ -19,6 +19,8 @@ classDiagram
     -Integer router_priority
     -Timer hello_timer
     -Timer wait_timer
+    -IPAddress designated_router
+    -IPAddress backup_designated_router
     +new_interface(interface_type,ip_version)
     +set_address(ip_address,ip_mask)
     +set_hello_interval(int)
