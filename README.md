@@ -10,3 +10,16 @@ and backup designated router (BDR).
 
 If the DR fails, the BDR automatically takes over to maintain network 
 operation. Each router manages its own neighbor table.
+
+
+## Documentation
+
+[ClassDiagram](/Documentation/Graphs/ClassDiagram.md)
+
+[NetworkTopologies](/Documentation/Graphs/NetworkTopologies.md)
+
+[PacketStructure](/Documentation/Graphs/PacketStructure.md)
+
+[StateDiagrams](/Documentation/Graphs/StateDiagrams.md)
+
+[TopLevelFlow](/Documentation/Graphs/TopLevelFlow.md)
