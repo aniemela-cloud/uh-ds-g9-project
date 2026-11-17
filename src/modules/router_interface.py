@@ -9,19 +9,18 @@ class InterfaceType(Enum):
     UNDEFINED = 0 #TODO: default / is this needed?
 
 class InterfaceState(Enum):
-    DOWN = 1
-    LOOPBACK = 2
+    DOWN = 0
+    LOOPBACK = 1
+    POINT-TO-POINT = 2
     WAITING = 3
-    POINT-TO-POINT = 4
-    DR-OTHER = 5
-    BACKUP = 6
-    DR = 7
-    UNDEFINED = 0   #TODO: default/ is this needed?
+    DR-OTHER = 4
+    BACKUP = 5
+    DR = 6
 
 class NetworkInterface:
-    def __init__(self):
-        id = 0                      #Unique
-        interface_type = InterfaceType.UNDEFINED    #enum
+    def __init__(self, interface_type, ip_version):
+        id = 0      #Unique before IPAddress is assigned
+        interface_type = InterfaceType.BROADCAST    #enum
         interface_state = InterfaceState.DOWN        #state
         ip_version = 4              #int
         ip_address = "0.0.0.0"      #IPAddress
