@@ -55,6 +55,21 @@ class SocketConnection(NetworkConnection):
     def __init__(self):
         super().__init__()
     
+    def __del__(self):
+        if self._sock is not None:
+            self._sock.close()
+    
+    def dispose(self):
+        """Disposes of this SocketConnection object.
+        
+        Intended for use in testing, this method closes the underlying socket
+        object if one exists and then deletes the reference so that the
+        destructor will not get confused and try to double-close it. 
+        """
+        if self._sock is not None:
+            self._sock.close()
+        self._sock = None
+    
     def connect_network(self, if_address: tuple) -> bool:
         """Connect to the network on the given interface.
         
