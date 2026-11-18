@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 import socket
 import select
+import struct
+
+# This should probably be in a global config file, TODO LATER
+MULTICAST_TTL = 2
 
 class NetworkConnection(ABC):
     """Abstract superclass for connection objects for NetworkInterface.
@@ -18,6 +22,14 @@ class NetworkConnection(ABC):
         The format of if_address depends on the underlying connection.
         Returns True if the connection was succesful, or False if the
         connection failed.
+        """
+    
+    @abstractmethod
+    def join_multicast(self, multicast_addr):
+        """Join the given multicast group.
+        
+        The format of multicast_addr depends on the underlying connection.
+        Raises an exception if any errors are encountered.
         """
     
     @abstractmethod
@@ -87,20 +99,48 @@ class SocketConnection(NetworkConnection):
         return True
     
     def connect_network_ex(self, if_address: tuple) -> bool:
-        """Connect to the network on the given interface, throwing an exception
-        from the underlying socket methods if they fail.
+        """Connect to the network on the given interface, throwing an 
+        exception from the underlying socket methods if they fail.
         
-        The format of if_address depends on the underlying connection.
-        For IPv4 it is a tuple consisting of the interface address and port 
-        number: (address, port). The address can be given as a string using
-        dot notation, e.g. '192.168.1.99' This method can be used instead of
-        connect_network() if more information is desired on the cause of the
-        failure. 
+        Functions otherwise like connect_network().
         """
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.bind(if_address)
         return True
+    
+    def join_multicast(self, multicast_addr):
+        """Join the specified multicast group.
         
+        For IPv4, multicast_addr should be a string representation of a 
+        multicast group address using dot notation, e.g. '224.1.1.1'.
+        A multicast group should only be joined after calling 
+        connect_network(). 
+        Raises an exception if the underlying socket has not been connected,
+        or if there is an error joining the multicast group.
+        """
+        if self._sock is None:
+            raise Exception(
+                "Attempted to join multicast group without \
+connecting first on SocketConnection.") # Throw some error
+            return
+        # Get the IP address this SocketConnection is bound to
+        my_addr, my_port = self._sock.getsockname()
+        # Turn the string dot notation addresses into a byte representation
+        multi_addr_bytes = socket.inet.aton(multicast_addr)
+        my_addr_bytes = socket.inet.aton(my_addr)
+        # Pack the byte representation addresses into a struct, plus a 0 to 
+        # indicate "any interface index".
+        # See https://manpages.debian.org/trixie/manpages/ip.7.en.html#IP_ADD_MEMBERSHIP
+        # for further information.
+        opt_struct = struct.pack('=4s4sl', multi_addr_bytes, my_addr_bytes, 0)
+        self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, 
+                              opt_struct)
+        # We'll probably be sending to the multicast group, too, so we'll set
+        # this socket's MULTICAST_TTL to limit how far our multicast messages
+        # travel. 
+        self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 
+                              MULTICAST_TTL)
+    
     def check_message(self) -> bool:
         """Checks the connection for pending messages.
         
@@ -109,13 +149,15 @@ class SocketConnection(NetworkConnection):
         Raises an exception if the underlying socket has not been connected.
         """
         if self._sock is None:
-            raise Exception("Attempted to check message without connecting first on SocketConnection.") # Throw some error
+            raise Exception("Attempted to check message without connecting \
+first on SocketConnection.") # Throw some error
             return
         # use select.select() to check if our sock is ready for reading
         # timeout value of 0 polls instead of blocking. 
         s_result = select.select([self._sock],[],[],0)
         if s_result is None or type(s_result) is not tuple:
-            raise Exception("Got a malformed result when using select on socket")
+            raise Exception(
+                "Got a malformed result when using select on socket")
         # If the sock is ready for reading, it will be included
         # in the list that is the first member of the 3-tuple returned
         # by select.select()
@@ -132,11 +174,12 @@ class SocketConnection(NetworkConnection):
 
         Returns a tuple (sender_address, bytes), where the format
         of sender_address depends on the connection type. 
-        Raises an exception if the underlying socket has not been connected, or
-        if there is an error in receiving the message.
+        Raises an exception if the underlying socket has not been connected,
+        or if there is an error in receiving the message.
         """
         if self._sock is None:
-            raise Exception("Attempted to get message without connecting first on SocketConnection.") # Throw some error
+            raise Exception("Attempted to get message without connecting \
+first on SocketConnection.") # Throw some error
             return
         # This is an ugly maximum size for a recv() call, but Python thankfully
         # will only allocate and return the amount of bytes that were actually 
@@ -145,9 +188,11 @@ class SocketConnection(NetworkConnection):
         # (65,535 bytes − 8-byte UDP header − 20-byte IP header).
         msg_tuple = self._sock.recvfrom(65507)
         if msg_tuple is None or type(msg_tuple) is not tuple:
-            raise Exception("Got a malformed result when using recvfrom on socket.")
+            raise Exception(
+                "Got a malformed result when using recvfrom on socket.")
         if len(msg_tuple[0]) == 0:
-            raise Exception("Calling recvfrom on socket read 0 bytes. Socket likely dead.")
+            raise Exception(
+                "Calling recvfrom on socket read 0 bytes. Socket likely dead.")
         return msg_tuple
 
     
@@ -161,7 +206,8 @@ class SocketConnection(NetworkConnection):
         Raises an exception if the underlying socket has not been connected.
         """
         if self._sock is None:
-            raise Exception("Attempted to send message without connecting first on SocketConnection.") # Throw some error
+            raise Exception("Attempted to send message without connecting \
+first on SocketConnection.") # Throw some error
             return
         self._sock.sendto(bytes, dest_address)
         pass
