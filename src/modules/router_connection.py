@@ -94,7 +94,7 @@ class SocketConnection(NetworkConnection):
         Raises an exception if the underlying socket has not been connected.
         """
         if self._sock is None:
-            raise Exception("Attempted to check message without connecting first on SocketConnection") # Throw some error
+            raise Exception("Attempted to check message without connecting first on SocketConnection.") # Throw some error
             return
         # use select.select() to check if our sock is ready for reading
         # timeout value of 0 polls instead of blocking. 
@@ -117,12 +117,24 @@ class SocketConnection(NetworkConnection):
 
         Returns a tuple (sender_address, bytes), where the format
         of sender_address depends on the connection type. 
-        Raises an exception if the underlying socket has not been connected.
+        Raises an exception if the underlying socket has not been connected, or
+        if there is an error in receiving the message.
         """
         if self._sock is None:
-            raise Exception("Attempted to get message without connecting first on SocketConnection") # Throw some error
+            raise Exception("Attempted to get message without connecting first on SocketConnection.") # Throw some error
             return
-        #msg_tuple = self._sock.recvfrom()
+        # This is an ugly maximum size for a recv() call, but Python thankfully
+        # will only allocate and return the amount of bytes that were actually 
+        # present in the datagram, and not a bunch of 0's. I think. I hope.
+        # Magic number pulled from Wikipedia: 
+        # (65,535 bytes − 8-byte UDP header − 20-byte IP header).
+        msg_tuple = self._sock.recvfrom(65507)
+        if msg_tuple is None or type(msg_tuple) is not tuple:
+            raise Exception("Got a malformed result when using recvfrom on socket.")
+        if len(msg_tuple[0]) == 0:
+            raise Exception("Calling recvfrom on socket read 0 bytes. Socket likely dead.")
+        return msg_tuple
+
     
     def send_message(self, dest_address, bytes):
         """Sends a message consisting of given bytes to the given address.
@@ -134,7 +146,7 @@ class SocketConnection(NetworkConnection):
         Raises an exception if the underlying socket has not been connected.
         """
         if self._sock is None:
-            raise Exception("Attempted to send message without connecting first on SocketConnection") # Throw some error
+            raise Exception("Attempted to send message without connecting first on SocketConnection.") # Throw some error
             return
         self._sock.sendto(bytes, dest_address)
         pass
