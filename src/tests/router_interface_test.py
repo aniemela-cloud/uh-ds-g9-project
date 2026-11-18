@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 from modules.router_interface import NetworkInterface, InterfaceState, InterfaceType
 
 class TestRouterInterface(unittest.TestCase):
@@ -27,3 +28,8 @@ class TestRouterInterface(unittest.TestCase):
         """Invalid IP address raises error"""
         pass
     
+    def test_interface_up_starts_thread(self):
+        """Bringing the interface up starts the hello timer thread"""
+        self.nw_if._hello_thread.start = MagicMock()
+        self.nw_if._interface_up()
+        self.nw_if._hello_thread.start.assert_called_once()

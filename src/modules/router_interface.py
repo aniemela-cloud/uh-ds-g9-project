@@ -1,6 +1,8 @@
 from enum import Enum
 from pathlib import Path
 import configparser
+from modules.periodic_timer import PeriodicTimer
+import threading
 
 debug = 0 #Set to 1 for debugging prints
 
@@ -23,19 +25,25 @@ class InterfaceState(Enum):
 class NetworkInterface:
     def __init__(self, given_id):
         self.id = given_id      #Unique/Given
-        self._interface_type = InterfaceType.BROADCAST    #enum/Given
-        self._interface_state = InterfaceState.DOWN        #state/Given
-        self._ip_version = 4              #int/Given
-        self._ip_address = "0.0.0.0"      #IPAddress/Config
-        self._ip_mask = "0.0.0.0"         #IPAddress/Config
-        self._hello_interval = 10         #Integer/Config
-        self._router_dead_interval = 40   #Integer/Config
-        self._router_priority = 0         #Integer/Config
-        self._hello_timer = 0             #Timer
-        self._wait_timer = 0              #Timer
-        self._designated_router = "0.0.0.0"        #IPAddress
-        self._backup_designated_router = "0.0.0.0" #IPAddress
-        self._neighbors = [] #List of neighbors
+        self._interface_type = InterfaceType.BROADCAST
+        self._interface_state = InterfaceState.DOWN
+        self._ip_version = 4
+        self._ip_address = "0.0.0.0"
+        self._ip_mask = "0.0.0.0"
+        self._hello_interval = 10
+        self._router_dead_interval = 40
+        self._router_priority = 0
+
+        #TODO Change callback funtion to self._send_hello to trigger real message
+        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
+        self._hello_thread = threading.Thread(
+            target=self._hello_timer.start,
+            daemon=True
+        )
+        self._wait_timer = 0              #Timer NOT READY
+        self._designated_router = "0.0.0.0"        #IPAddress NOT READY
+        self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
+        self._neighbors = [] #List of neighbors NOT READY
 
     def new_interface(self, interface_type, ip_version, config_file):
         """Method reads configuration data from given file and 
@@ -81,6 +89,11 @@ class NetworkInterface:
         except ValueError:
             self.set_router_priority("0")
 
+        #Recreate timer with new values from config
+        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
+
+        #Missing Wait timer
+
     def get_id(self):
         return self.id
 
@@ -106,28 +119,32 @@ class NetworkInterface:
         return self._ip_mask
 
     def set_hello_interval(self, hello_interval): #private?
+        #TODO validation
         self._hello_interval = hello_interval
 
     def get_hello_interval(self):
         return self._hello_interval
 
     def set_router_dead_interval(self, router_dead_interval):
+        #TODO validation
         self._router_dead_interval = router_dead_interval
 
     def get_router_dead_interval(self):
         return self._router_dead_interval
 
     def set_router_priority(self, router_priority):
+        #TODO validation
         self._router_priority = router_priority
 
     def get_router_priority(self):
         return self._router_priority
 
-    def receive_event(self, interface_event): #What is this?
+    def receive_event(self, interface_event):
         pass
 
     def _interface_up(self):
-        pass
+        """Timer starts when interface is up"""
+        self._hello_thread.start()
 
     def _backup_seen(self):
         pass
@@ -149,6 +166,8 @@ class NetworkInterface:
 
     def _send_hello(self):
         """Triggers Message class to send a Hello message"""
+        #hello = Message(self.id)
+        #hello.send()
         pass
 
     def _receive_hello(self):
@@ -158,7 +177,8 @@ class NetworkInterface:
 
     def sayhello(self):
         """Method for testing this class"""
-        return f"Hello! I am an interface instance id: {self.id}"
+        print(f"Hello! I am an interface instance id: {self.id} Hello interval {self._hello_interval}")
+
 
     def __str__(self):
         """Creates a string which contains attribute values."""
