@@ -35,6 +35,7 @@ class NetworkInterface:
         self._wait_timer = 0              #Timer
         self._designated_router = "0.0.0.0"        #IPAddress
         self._backup_designated_router = "0.0.0.0" #IPAddress
+        self._neighbors = [] #List of neighbors
 
     def new_interface(self, interface_type, ip_version, config_file):
         """Method reads configuration data from given file and 
@@ -61,23 +62,48 @@ class NetworkInterface:
             if key not in config[section]:
                 raise ValueError(f"Missing key '{key}' in section [{section}]")
 
-        #TODO: do these fallback values need to be something else
-        self.set_address(config.get("network", "ip_address", fallback="0.0.0.0"),
-                         config.get("network", "ip_mask", fallback="0.0.0.0"))
-        self.set_hello_interval(config.get("interval", "hello", fallback=10))
-        self.set_router_dead_interval(config.get("interval", "dead", fallback=40))
-        self.set_router_priority(config.get("router", "priority", fallback=0))
-
+        #If values are not accepted, fallback values are set as default
+        try:
+            self.set_address(config.get("network", "ip_address", fallback="0.0.0.0"),
+                                config.get("network", "ip_mask", fallback="0.0.0.0"))
+        except ValueError:
+            self.set_address("0.0.0.0", "0.0.0.0")
+        try:
+            self.set_hello_interval(config.getint("interval", "hello", fallback="10"))
+        except ValueError:
+            self.set_hello_interval("10")
+        try:
+            self.set_router_dead_interval(config.getint("interval", "dead", fallback="40"))
+        except ValueError:
+            self.set_router_dead_interval("40")
+        try:
+            self.set_router_priority(config.getint("router", "priority", fallback="0"))
+        except ValueError:
+            self.set_router_priority("0")
 
     def get_id(self):
         return self.id
 
-    def set_address(self, ip_address,ip_mask):
+    def get_interface_type(self):
+        return self._interface_type
+
+    def get_interface_state(self):
+        return self._interface_state
+
+    def set_address(self, ip_address, ip_mask):
+        """Set IP address and mask"""
+        #TODO validation
         self._ip_address = ip_address
         self._ip_mask = ip_mask
 
+    def get_ip_version(self):
+        return self._ip_version
+
     def get_address(self):
         return self._ip_address
+
+    def get_mask(self):
+        return self._ip_mask
 
     def set_hello_interval(self, hello_interval): #private?
         self._hello_interval = hello_interval
@@ -96,7 +122,6 @@ class NetworkInterface:
 
     def get_router_priority(self):
         return self._router_priority
-
 
     def receive_event(self, interface_event): #What is this?
         pass
@@ -123,12 +148,16 @@ class NetworkInterface:
         pass
 
     def _send_hello(self):
+        """Triggers Message class to send a Hello message"""
         pass
 
     def _receive_hello(self):
+        """Based on received message
+        creates a neighbor or updates an old"""
         pass
 
     def sayhello(self):
+        """Method for testing this class"""
         return f"Hello! I am an interface instance id: {self.id}"
 
     def __str__(self):
