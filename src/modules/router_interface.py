@@ -30,6 +30,7 @@ class NetworkInterface:
         self._ip_version = 4
         self._ip_address = "0.0.0.0"
         self._ip_mask = "0.0.0.0"
+        self._area_id = 0
         self._hello_interval = 10
         self._router_dead_interval = 40
         self._router_priority = 0
@@ -42,10 +43,9 @@ class NetworkInterface:
         )
         self._wait_timer = 0              #Timer NOT READY
 
-        self._area_id = 0
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
-        self._neighbors = [] #List of neighbors NOT READY
+        self._neighbors = [] #List of neighbor instances NOT READY
 
     def new_interface(self, interface_type, ip_version, config_file):
         """Method reads configuration data from given file and 
@@ -150,6 +150,25 @@ class NetworkInterface:
 
     def get_router_priority(self):
         return self._router_priority
+
+    def set_designated_router(self, designater_router):
+        self._designated_router = designater_router
+
+    def get_designated_router(self):
+        return self._designated_router
+
+    def set_backup_router(self, backup_router):
+        self._backup_designated_router = backup_router
+
+    def get_backup_router(self):
+        return self._backup_designated_router
+
+    def get_neighbors(self):
+        neighbor_ips = []
+        #TODO update after Neighbor is created
+        #for ip in self._neighbors:
+        #    neighbor_ips.append = self._neighbors.get_ip()
+        return neighbor_ips
 
     def receive_event(self, interface_event):
         pass
