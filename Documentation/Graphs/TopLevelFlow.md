@@ -10,6 +10,7 @@ flowchart TB
 
   subgraph InterfaceBC
     Interface[Interface]
+    PeriodicTimer
     %%InterfaceEvent
 
     subgraph MessageBC
@@ -49,6 +50,8 @@ flowchart TB
   Interface -.request.-> Election
   Election -.return.-> Interface
   Interface -.create/update.-> Neighbor
+
+  Interface <--> PeriodicTimer
 
   %%Interface<-->InterfaceEvent
   %%Neighbor<-->NeighborEvent
