@@ -17,6 +17,7 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual(11, self.nw_if.get_hello_interval())
         self.assertEqual(41, self.nw_if.get_router_dead_interval())
         self.assertEqual(8, self.nw_if.get_router_priority())
+        self.assertEqual(2, self.nw_if.get_area_id())
 
     def test_valid_set_address(self):
         """Testing IP address change"""

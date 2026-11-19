@@ -41,6 +41,8 @@ class NetworkInterface:
             daemon=True
         )
         self._wait_timer = 0              #Timer NOT READY
+
+        self._area_id = 0
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
         self._neighbors = [] #List of neighbors NOT READY
@@ -61,7 +63,7 @@ class NetworkInterface:
         config_file = Path(__file__).parent.parent / "config" / config_file
         config.read(config_file)
 
-        required = [("network", "ip_address"), ("network", "ip_mask"),
+        required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
 
         for section, key in required:
@@ -76,6 +78,10 @@ class NetworkInterface:
                                 config.get("network", "ip_mask", fallback="0.0.0.0"))
         except ValueError:
             self.set_address("0.0.0.0", "0.0.0.0")
+        try:
+            self.set_area_id(config.getint("network", "area_id", fallback="0"))
+        except ValueError:
+            self.set_area_id("0")
         try:
             self.set_hello_interval(config.getint("interval", "hello", fallback="10"))
         except ValueError:
@@ -117,6 +123,12 @@ class NetworkInterface:
 
     def get_mask(self):
         return self._ip_mask
+
+    def set_area_id(self, area_id):
+        self._area_id = area_id
+
+    def get_area_id(self):
+        return self._area_id
 
     def set_hello_interval(self, hello_interval): #private?
         #TODO validation
