@@ -2,6 +2,9 @@ import unittest
 from unittest.mock import MagicMock
 from modules.router_interface import NetworkInterface, InterfaceState, InterfaceType
 
+#Notice: Requires configuration test file config/config_test.ini
+
+
 class TestRouterInterface(unittest.TestCase):
     def setUp(self):
         self.nw_if = NetworkInterface(10)
@@ -21,14 +24,17 @@ class TestRouterInterface(unittest.TestCase):
 
     def test_valid_set_address(self):
         """Testing IP address change"""
-        self.nw_if.set_address("10.0.0.2", "255.0.0.0")
+        self.nw_if.set_address("10.0.0.2", "255.0.0.0/20")
         self.assertEqual("10.0.0.2", self.nw_if.get_address())
-        self.assertEqual("255.0.0.0", self.nw_if.get_mask())
+        self.assertEqual("255.0.0.0/20", self.nw_if.get_mask())
 
-    def test_invalid_set_addrees(self):
-        """Invalid IP address raises error"""
-        pass
-    
+    def test_invalid_set_address(self):
+        """Invalid IP address falls back to default values"""
+        self.nw_if.set_address("10.0.1", "255.0.0.0/13")
+        self.assertEqual("0.0.0.0", self.nw_if.get_address())
+        self.assertEqual("0.0.0.0", self.nw_if.get_mask())
+
+
     def test_interface_up_starts_thread(self):
         """Bringing the interface up starts the hello timer thread"""
         self.nw_if._hello_thread.start = MagicMock()

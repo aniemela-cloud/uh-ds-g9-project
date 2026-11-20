@@ -3,6 +3,7 @@ from pathlib import Path
 import configparser
 from modules.periodic_timer import PeriodicTimer
 import threading
+import ipaddress
 
 debug = 0 #Set to 1 for debugging prints
 
@@ -21,6 +22,22 @@ class InterfaceState(Enum):
     DROTHER = 4
     BACKUP = 5
     DR = 6
+
+def is_valid_ip(ip):
+    """Validates that IPv4 or IPv6 address is right format"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+def is_valid_network(network):
+    """Validates that IPv4 or IPv6 network mask address is right format"""
+    try:
+        ipaddress.ip_network(network)
+        return True
+    except ValueError:
+        return False
 
 class NetworkInterface:
     def __init__(self, given_id):
@@ -49,8 +66,9 @@ class NetworkInterface:
 
     def new_interface(self, interface_type, ip_version, config_file):
         """Method reads configuration data from given file and 
-        checks all data is found before updating values."""
-        #self._interface_type = InterfaceType(interface_type)
+        checks all data is found before updating values. 
+        If data is incorrect falls back to default values."""
+
         try:
             self._interface_type = InterfaceType(interface_type)
         except ValueError:
@@ -72,7 +90,6 @@ class NetworkInterface:
             if key not in config[section]:
                 raise ValueError(f"Missing key '{key}' in section [{section}]")
 
-        #If values are not accepted, fallback values are set as default
         try:
             self.set_address(config.get("network", "ip_address", fallback="0.0.0.0"),
                                 config.get("network", "ip_mask", fallback="0.0.0.0"))
@@ -111,9 +128,10 @@ class NetworkInterface:
 
     def set_address(self, ip_address, ip_mask):
         """Set IP address and mask"""
-        #TODO validation
-        self._ip_address = ip_address
-        self._ip_mask = ip_mask
+        if( (is_valid_ip(ip_address)) & (is_valid_network(ip_mask)) ):
+            self._ip_address = ip_address
+            self._ip_mask = ip_mask
+        return False
 
     def get_ip_version(self):
         return self._ip_version
