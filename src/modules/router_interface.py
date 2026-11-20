@@ -120,7 +120,6 @@ class NetworkInterface:
     def get_interface_type(self):
         return self._interface_type
 
-
     def set_interface_state(self, state):
         """Switches state, state is given as integer"""
         try:

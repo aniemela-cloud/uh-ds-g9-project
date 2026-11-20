@@ -68,3 +68,19 @@ class TestRouterInterface(unittest.TestCase):
         mock_thread.return_value = mock_thread_instance
         self.nw_if._interface_up()
         mock_thread_instance.start.assert_called_once()
+
+    def test_valid_designated_router(self):
+        self.nw_if.set_designated_router("10.0.0.3")
+        self.assertEqual("10.0.0.3", self.nw_if.get_designated_router())
+
+    def test_ivalid_designated_router(self):
+        self.assertFalse(self.nw_if.set_designated_router("3"))
+        self.assertFalse(self.nw_if.set_designated_router("naapuri"))
+
+    def test_valid_backup_router(self):
+        self.nw_if.set_backup_router("10.0.0.4")
+        self.assertEqual("10.0.0.4", self.nw_if.get_backup_router())
+
+    def test_ivalid_backup_router(self):
+        self.assertFalse(self.nw_if.set_backup_router("4"))
+        self.assertFalse(self.nw_if.set_backup_router("vara"))
