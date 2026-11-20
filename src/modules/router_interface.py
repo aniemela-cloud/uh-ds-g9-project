@@ -52,10 +52,10 @@ class NetworkInterface:
         self._router_dead_interval = 40
         self._router_priority = 0
 
-        #Timers are set when Interface is set up
-        self._hello_timer = None #PeriodicTimer(self._hello_interval, self.sayhello)
-        self._hello_thread = None #threading.Thread(target=self._hello_timer.start, daemon=True)
-        self._wait_timer = None              #Timer NOT READY
+        #Timers are set at method _interface_up()
+        self._hello_timer = None
+        self._hello_thread = None
+        self._wait_timer = None
 
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
@@ -66,6 +66,7 @@ class NetworkInterface:
         checks all data is found before updating values. 
         If data is incorrect falls back to default values."""
 
+        #Setting type and IP version
         try:
             self._interface_type = InterfaceType(interface_type)
         except ValueError:
@@ -74,6 +75,7 @@ class NetworkInterface:
             raise ValueError(f"Invalid IP version [{ip_version}]")
         self._ip_version = ip_version
 
+        #Reading values from config file
         config = configparser.ConfigParser()
         config_file = Path(__file__).parent.parent / "config" / config_file
         if not config.read(config_file):
@@ -88,6 +90,7 @@ class NetworkInterface:
             if key not in config[section]:
                 raise ValueError(f"Missing key '{key}' in section [{section}]")
 
+        #Setting values from config file
         try:
             self.set_address(config.get("network", "ip_address", fallback="0.0.0.0"),
                                 config.get("network", "ip_mask", fallback="0.0.0.0"))
@@ -116,6 +119,14 @@ class NetworkInterface:
 
     def get_interface_type(self):
         return self._interface_type
+
+
+    def set_interface_state(self, state):
+        """Switches state, state is given as integer"""
+        try:
+            self._interface_state = InterfaceState(state)
+        except ValueError:
+            return False
 
     def get_interface_state(self):
         return self._interface_state
@@ -204,7 +215,7 @@ class NetworkInterface:
         pass
 
     def _interface_up(self):
-        """Changing to UP status
+        """Switching to UP status
         Stop and remove old timers before starting new"""
 
         #Remove old hello timer if exists

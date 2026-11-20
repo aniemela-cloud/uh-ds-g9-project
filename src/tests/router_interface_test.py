@@ -23,6 +23,13 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual(8, self.nw_if.get_router_priority())
         self.assertEqual(2, self.nw_if.get_area_id())
 
+    def test_valid_state(self):
+            self.nw_if.set_interface_state(6)
+            self.assertEqual(InterfaceState.DR, self.nw_if.get_interface_state())
+
+    def test_invalid_state(self):
+            self.assertFalse(self.nw_if.set_interface_state(-1))
+
     def test_valid_set_address(self):
         """Testing IP address change"""
         self.nw_if.set_address("10.0.0.2", "255.0.0.0/20")
