@@ -3,6 +3,7 @@ from pathlib import Path
 import configparser
 from modules.periodic_timer import PeriodicTimer
 import threading
+from modules.message import HelloMessage
 
 debug = 0 #Set to 1 for debugging prints
 
@@ -195,16 +196,20 @@ class NetworkInterface:
     def _unloop_ind(self):
         pass
 
-    def _send_hello(self):
+    def _send_hello(self, connection, destination, router_id):
         """Triggers Message class to send a Hello message"""
-        #hello = Message(self.id)
-        #hello.send()
-        pass
+        message = HelloMessage.from_interface(self, router_id)
+        message_bytes = message.to_bytes()
+        connection.send_message(destination, message_bytes)
 
-    def _receive_hello(self):
+    def _receive_hello(self, connection):
         """Based on received message
         creates a neighbor or updates an old"""
-        pass
+        if not connection.check_message():
+            return
+        message_bytes, sender_address = connection.get_message()
+        message = HelloMessage.from_bytes(message_bytes)
+        # Later: validate the message and update the neighbor.
 
     def sayhello(self):
         """Method for testing this class"""
@@ -223,3 +228,4 @@ class NetworkInterface:
             f"Interval dead router: {self._router_dead_interval}\n"
             f"Router priority: {self._router_priority}\n"
         )
+
