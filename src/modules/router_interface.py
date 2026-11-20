@@ -41,7 +41,10 @@ def is_valid_network(network):
 
 class NetworkInterface:
     def __init__(self, given_id):
-        self.id = given_id      #Unique/Given
+        try:
+            self.id = int(given_id)
+        except ValueError:
+            raise ValueError("ID must be an integer")
         self._interface_type = InterfaceType.BROADCAST
         self._interface_state = InterfaceState.DOWN
         self._ip_version = 4
@@ -191,14 +194,20 @@ class NetworkInterface:
     def get_router_priority(self):
         return self._router_priority
 
-    def set_designated_router(self, designater_router):
-        self._designated_router = designater_router
+    def set_designated_router(self, designated_router):
+        """Seting Designated router IP address and its validation"""
+        if(is_valid_ip(designated_router)):
+            self._designated_router = designated_router
+        return False
 
     def get_designated_router(self):
         return self._designated_router
 
     def set_backup_router(self, backup_router):
-        self._backup_designated_router = backup_router
+        """Seting Designated backup router IP address and its validation"""
+        if(is_valid_ip(backup_router)):
+            self._backup_designated_router = backup_router
+        return False
 
     def get_backup_router(self):
         return self._backup_designated_router
