@@ -23,3 +23,7 @@ operation. Each router manages its own neighbor table.
 [StateDiagrams](/Documentation/Graphs/StateDiagrams.md)
 
 [TopLevelFlow](/Documentation/Graphs/TopLevelFlow.md)
+
+## Reference
+
+RFC 2328: OSPF Version 2: [https://www.rfc-editor.org/info/rfc2328/](https://www.rfc-editor.org/info/rfc2328/)
