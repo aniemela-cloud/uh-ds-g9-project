@@ -143,28 +143,46 @@ class NetworkInterface:
         return self._ip_mask
 
     def set_area_id(self, area_id):
-        self._area_id = area_id
+        try:
+            self._area_id = int(area_id)
+        except ValueError:
+            return False
 
     def get_area_id(self):
         return self._area_id
 
-    def set_hello_interval(self, hello_interval): #private?
-        #TODO validation
-        self._hello_interval = hello_interval
+    def set_hello_interval(self, hello_interval):
+        try:
+            value = int(hello_interval)
+            if not 1 <= value <= 100: # Min and Max
+                return False
+            self._hello_interval = value
+        except ValueError:
+            return False
 
     def get_hello_interval(self):
         return self._hello_interval
 
     def set_router_dead_interval(self, router_dead_interval):
-        #TODO validation
-        self._router_dead_interval = router_dead_interval
+        try:
+            value = int(router_dead_interval)
+            if not 1 <= value <= 1000: # Min and Max
+                return False
+            self._router_dead_interval = value
+        except ValueError:
+            return False
 
     def get_router_dead_interval(self):
         return self._router_dead_interval
 
     def set_router_priority(self, router_priority):
-        #TODO validation
-        self._router_priority = router_priority
+        try:
+            value = int(router_priority)
+            if not 1 <= value <= 17000: # Min and Max
+                return False
+            self._router_priority = value
+        except ValueError:
+            return False
 
     def get_router_priority(self):
         return self._router_priority

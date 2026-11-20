@@ -18,7 +18,8 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual("192.168.1.10", self.nw_if.get_address())
         self.assertEqual("255.255.255.0", self.nw_if.get_mask())
         self.assertEqual(11, self.nw_if.get_hello_interval())
-        self.assertEqual(41, self.nw_if.get_router_dead_interval())
+        self.nw_if.set_router_dead_interval("200") #Integer conversion
+        self.assertEqual(200, self.nw_if.get_router_dead_interval())
         self.assertEqual(8, self.nw_if.get_router_priority())
         self.assertEqual(2, self.nw_if.get_area_id())
 
@@ -33,6 +34,24 @@ class TestRouterInterface(unittest.TestCase):
         self.nw_if.set_address("10.0.1", "255.0.0.0/13")
         self.assertEqual("0.0.0.0", self.nw_if.get_address())
         self.assertEqual("0.0.0.0", self.nw_if.get_mask())
+
+    def test_invalid_hello_interval(self):
+        self.nw_if.set_hello_interval(200) #Max limit 100
+        self.assertEqual(10, self.nw_if.get_hello_interval()) #default 10
+
+    def test_invalid_dead_interval(self):
+        self.nw_if.set_router_dead_interval(2000) #Max limit 1000
+        self.assertEqual(40, self.nw_if.get_router_dead_interval()) #default 40
+        self.nw_if.set_router_dead_interval("a") #Integer conversion
+        self.assertEqual(40, self.nw_if.get_router_dead_interval()) #default 40
+
+    def test_invalid_router_priority(self):
+        self.nw_if.set_router_priority(-2) #Min limit 1
+        self.assertEqual(0, self.nw_if.get_router_priority()) #Default 0
+
+    def test_invalid_area_id(self):
+        self.nw_if.set_router_priority("a") #Integer
+        self.assertEqual(0, self.nw_if.get_area_id()) #default 0
 
 
     def test_interface_up_starts_thread(self):
