@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 from modules.router_interface import NetworkInterface, InterfaceState, InterfaceType
 
 #Notice: Requires configuration test file config/config_test.ini
@@ -54,8 +54,10 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual(0, self.nw_if.get_area_id()) #default 0
 
 
-    def test_interface_up_starts_thread(self):
+    @patch("modules.router_interface.threading.Thread")
+    def test_interface_up_starts_thread(self, mock_thread):
         """Bringing the interface up starts the hello timer thread"""
-        self.nw_if._hello_thread.start = MagicMock()
+        mock_thread_instance = MagicMock()
+        mock_thread.return_value = mock_thread_instance
         self.nw_if._interface_up()
-        self.nw_if._hello_thread.start.assert_called_once()
+        mock_thread_instance.start.assert_called_once()

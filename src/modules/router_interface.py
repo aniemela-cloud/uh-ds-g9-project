@@ -52,13 +52,10 @@ class NetworkInterface:
         self._router_dead_interval = 40
         self._router_priority = 0
 
-        #TODO Change callback funtion to self._send_hello to trigger real message
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-        self._hello_thread = threading.Thread(
-            target=self._hello_timer.start,
-            daemon=True
-        )
-        self._wait_timer = 0              #Timer NOT READY
+        #Timers are set when Interface is set up
+        self._hello_timer = None #PeriodicTimer(self._hello_interval, self.sayhello)
+        self._hello_thread = None #threading.Thread(target=self._hello_timer.start, daemon=True)
+        self._wait_timer = None              #Timer NOT READY
 
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
@@ -113,10 +110,6 @@ class NetworkInterface:
         except ValueError:
             self.set_router_priority("0")
 
-        #Recreate timer with new values from config
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-
-        #Missing Wait timer
 
     def get_id(self):
         return self.id
@@ -211,8 +204,27 @@ class NetworkInterface:
         pass
 
     def _interface_up(self):
-        """Timer starts when interface is up"""
+        """Changing to UP status
+        Stop and remove old timers before starting new"""
+
+        #Remove old hello timer if exists
+        if self._hello_timer:
+            self._hello_timer.stop()
+            self._hello_timer = None
+
+        #Create new timer
+        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
+
+        #Remove old thread if exists
+        if self._hello_thread:
+            self._hello_thread.join() #Wait for thread to finnish
+
+        #Create new thread and start
+        self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
         self._hello_thread.start()
+
+        self._wait_timer = None              #Timer NOT READY
+
 
     def _backup_seen(self):
         pass
