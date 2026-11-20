@@ -79,7 +79,8 @@ class NetworkInterface:
 
         config = configparser.ConfigParser()
         config_file = Path(__file__).parent.parent / "config" / config_file
-        config.read(config_file)
+        if not config.read(config_file):
+            raise FileNotFoundError(f"Config file not found: {config_file}")
 
         required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
