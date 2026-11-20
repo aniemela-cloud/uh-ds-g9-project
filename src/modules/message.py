@@ -25,6 +25,7 @@ class HelloMessage:
             router_dead_interval=interface.get_router_dead_interval(),
             designated_router=interface.get_designated_router(),
             backup_designated_router=interface.get_backup_router(),
+            # TODO: Replace IP addresses with recently heard neighbor router IDs.
             neighbors=interface.get_neighbors(),
         )
     def to_bytes(self) -> bytes:
