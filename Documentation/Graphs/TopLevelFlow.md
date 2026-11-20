@@ -37,15 +37,17 @@ flowchart TB
   File -.fetch.-> Main
   Main -.init(Config).-> Interface
 
-  Interface -.trigger.-> Message
-  Message -.send.-> ByteConverter
-  ByteConverter -.send.-> Socket
+  Interface -.send.-> Message
+  Interface -.poll.-> Message
+  Message -.encode/decode.-> ByteConverter
+  ByteConverter -.encoded/decoded.-> Message
+  Message -.send.->Socket
+  Message -.poll.->Socket
   Socket -.send.-> Broadcast
 
   Broadcast -.receive.-> Socket
-  Socket -.receive.-> ByteConverter
-  ByteConverter -.receive.-> Message
-  Message -.receive.-> Interface
+  Socket -.pollresponse.-> Message
+  Message -.pollresponse.-> Interface
 
   Interface -.request.-> Election
   Election -.return.-> Interface

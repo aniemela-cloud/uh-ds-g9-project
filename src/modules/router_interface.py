@@ -1,10 +1,12 @@
 from enum import Enum
 from pathlib import Path
 import configparser
-from modules.periodic_timer import PeriodicTimer
 import threading
+import ipaddress
+from modules.periodic_timer import PeriodicTimer
+from modules.router_neighbor import Neighbor, NeighborState
 
-debug = 0 #Set to 1 for debugging prints
+debug = 0 #Set to 1 for debugging / Add one neighbor at start
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -22,9 +24,28 @@ class InterfaceState(Enum):
     BACKUP = 5
     DR = 6
 
+def is_valid_ip(ip):
+    """Validates that IPv4 or IPv6 address is right format"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+def is_valid_network(network):
+    """Validates that IPv4 or IPv6 network mask address is right format"""
+    try:
+        ipaddress.ip_network(network)
+        return True
+    except ValueError:
+        return False
+
 class NetworkInterface:
     def __init__(self, given_id):
-        self.id = given_id      #Unique/Given
+        try:
+            self.id = int(given_id)
+        except ValueError:
+            raise ValueError("ID must be an integer")
         self._interface_type = InterfaceType.BROADCAST
         self._interface_state = InterfaceState.DOWN
         self._ip_version = 4
@@ -35,22 +56,23 @@ class NetworkInterface:
         self._router_dead_interval = 40
         self._router_priority = 0
 
-        #TODO Change callback funtion to self._send_hello to trigger real message
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-        self._hello_thread = threading.Thread(
-            target=self._hello_timer.start,
-            daemon=True
-        )
-        self._wait_timer = 0              #Timer NOT READY
+        #Timers are set at method _interface_up()
+        self._hello_timer = None
+        self._hello_thread = None
+        self._wait_timer = None
 
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
+
+        self.next_neighbor_id = 1
         self._neighbors = [] #List of neighbor instances NOT READY
 
     def new_interface(self, interface_type, ip_version, config_file):
         """Method reads configuration data from given file and 
-        checks all data is found before updating values."""
-        #self._interface_type = InterfaceType(interface_type)
+        checks all data is found before updating values. 
+        If data is incorrect falls back to default values."""
+
+        #Setting type and IP version
         try:
             self._interface_type = InterfaceType(interface_type)
         except ValueError:
@@ -59,9 +81,11 @@ class NetworkInterface:
             raise ValueError(f"Invalid IP version [{ip_version}]")
         self._ip_version = ip_version
 
+        #Reading values from config file
         config = configparser.ConfigParser()
         config_file = Path(__file__).parent.parent / "config" / config_file
-        config.read(config_file)
+        if not config.read(config_file):
+            raise FileNotFoundError(f"Config file not found: {config_file}")
 
         required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
@@ -72,7 +96,7 @@ class NetworkInterface:
             if key not in config[section]:
                 raise ValueError(f"Missing key '{key}' in section [{section}]")
 
-        #If values are not accepted, fallback values are set as default
+        #Setting values from config file
         try:
             self.set_address(config.get("network", "ip_address", fallback="0.0.0.0"),
                                 config.get("network", "ip_mask", fallback="0.0.0.0"))
@@ -95,10 +119,6 @@ class NetworkInterface:
         except ValueError:
             self.set_router_priority("0")
 
-        #Recreate timer with new values from config
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-
-        #Missing Wait timer
 
     def get_id(self):
         return self.id
@@ -106,14 +126,22 @@ class NetworkInterface:
     def get_interface_type(self):
         return self._interface_type
 
+    def set_interface_state(self, state):
+        """Switches state, state is given as integer"""
+        try:
+            self._interface_state = InterfaceState(state)
+        except ValueError:
+            return False
+
     def get_interface_state(self):
         return self._interface_state
 
     def set_address(self, ip_address, ip_mask):
         """Set IP address and mask"""
-        #TODO validation
-        self._ip_address = ip_address
-        self._ip_mask = ip_mask
+        if( (is_valid_ip(ip_address)) & (is_valid_network(ip_mask)) ):
+            self._ip_address = ip_address
+            self._ip_mask = ip_mask
+        return False
 
     def get_ip_version(self):
         return self._ip_version
@@ -125,57 +153,105 @@ class NetworkInterface:
         return self._ip_mask
 
     def set_area_id(self, area_id):
-        self._area_id = area_id
+        try:
+            self._area_id = int(area_id)
+        except ValueError:
+            return False
 
     def get_area_id(self):
         return self._area_id
 
-    def set_hello_interval(self, hello_interval): #private?
-        #TODO validation
-        self._hello_interval = hello_interval
+    def set_hello_interval(self, hello_interval):
+        try:
+            value = int(hello_interval)
+            if not 1 <= value <= 100: # Min and Max
+                return False
+            self._hello_interval = value
+        except ValueError:
+            return False
 
     def get_hello_interval(self):
         return self._hello_interval
 
     def set_router_dead_interval(self, router_dead_interval):
-        #TODO validation
-        self._router_dead_interval = router_dead_interval
+        try:
+            value = int(router_dead_interval)
+            if not 1 <= value <= 1000: # Min and Max
+                return False
+            self._router_dead_interval = value
+        except ValueError:
+            return False
 
     def get_router_dead_interval(self):
         return self._router_dead_interval
 
     def set_router_priority(self, router_priority):
-        #TODO validation
-        self._router_priority = router_priority
+        try:
+            value = int(router_priority)
+            if not 1 <= value <= 17000: # Min and Max
+                return False
+            self._router_priority = value
+        except ValueError:
+            return False
 
     def get_router_priority(self):
         return self._router_priority
 
-    def set_designated_router(self, designater_router):
-        self._designated_router = designater_router
+    def set_designated_router(self, designated_router):
+        """Seting Designated router IP address and its validation"""
+        if(is_valid_ip(designated_router)):
+            self._designated_router = designated_router
+        return False
 
     def get_designated_router(self):
         return self._designated_router
 
     def set_backup_router(self, backup_router):
-        self._backup_designated_router = backup_router
+        """Seting Designated backup router IP address and its validation"""
+        if(is_valid_ip(backup_router)):
+            self._backup_designated_router = backup_router
+        return False
 
     def get_backup_router(self):
         return self._backup_designated_router
 
     def get_neighbors(self):
+        """Returns a list of neighbor IP addresses"""
         neighbor_ips = []
-        #TODO update after Neighbor is created
-        #for ip in self._neighbors:
-        #    neighbor_ips.append = self._neighbors.get_ip()
+        for member in self._neighbors:
+        #TODO add validation that appends only active neighbors based on NeighborState
+             neighbor_ips.append(member.get_address())
         return neighbor_ips
 
     def receive_event(self, interface_event):
         pass
 
     def _interface_up(self):
-        """Timer starts when interface is up"""
+        """Switching to UP status
+        Stop and remove old timers before starting new"""
+
+        #Remove old hello timer if exists
+        if self._hello_timer:
+            self._hello_timer.stop()
+            self._hello_timer = None
+
+        #Create new timer
+        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
+
+        #Remove old thread if exists
+        if self._hello_thread:
+            self._hello_thread.join() #Wait for thread to finnish
+
+        #Create new thread and start
+        self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
         self._hello_thread.start()
+
+        self._wait_timer = None              #Timer NOT READY
+
+        #Test to add one neighbor
+        if debug:
+            self._neighbor_change("new", None)
+            print(self.get_neighbors())
 
     def _backup_seen(self):
         pass
@@ -183,8 +259,16 @@ class NetworkInterface:
     def _wait_timer_triggered(self):
         pass
 
-    def _neighbor_change(self):
-        pass
+    def _neighbor_change(self, changetype, values=None):
+        """Handling neighbor table"""
+        #TODO not ready at all
+        #Create new
+        if(changetype=="new"):
+            new_nb = Neighbor(self.next_neighbor_id)
+            self.next_neighbor_id += 1
+            if new_nb.new_neighbor("10.0.0.7"):
+                new_nb.set_neighbor_state(2) #Init
+                self._neighbors.append(new_nb)
 
     def _interface_down(self):
         pass
