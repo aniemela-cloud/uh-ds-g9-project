@@ -9,6 +9,10 @@ class TestRouterInterface(unittest.TestCase):
     def setUp(self):
         self.nw_if = NetworkInterface(10)
 
+    def test_invalid_id(self):
+        with self.assertRaises(ValueError):
+            NetworkInterface("abc")
+
     def test_valid_new_interface(self):
         """Setting initial values"""
         self.nw_if.new_interface(1,4,"config_test.ini")

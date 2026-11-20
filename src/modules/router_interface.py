@@ -1,11 +1,12 @@
 from enum import Enum
 from pathlib import Path
 import configparser
-from modules.periodic_timer import PeriodicTimer
 import threading
 import ipaddress
+from modules.periodic_timer import PeriodicTimer
+from modules.router_neighbor import Neighbor, NeighborState
 
-debug = 0 #Set to 1 for debugging prints
+debug = 0 #Set to 1 for debugging / Add one neighbor at start
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -62,6 +63,8 @@ class NetworkInterface:
 
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
+
+        self.next_neighbor_id = 1
         self._neighbors = [] #List of neighbor instances NOT READY
 
     def new_interface(self, interface_type, ip_version, config_file):
@@ -213,10 +216,11 @@ class NetworkInterface:
         return self._backup_designated_router
 
     def get_neighbors(self):
+        """Returns a list of neighbor IP addresses"""
         neighbor_ips = []
-        #TODO update after Neighbor is created
-        #for ip in self._neighbors:
-        #    neighbor_ips.append = self._neighbors.get_ip()
+        for member in self._neighbors:
+        #TODO add validation that appends only active neighbors based on NeighborState
+             neighbor_ips.append(member.get_address())
         return neighbor_ips
 
     def receive_event(self, interface_event):
@@ -244,6 +248,10 @@ class NetworkInterface:
 
         self._wait_timer = None              #Timer NOT READY
 
+        #Test to add one neighbor
+        if debug:
+            self._neighbor_change("new", None)
+            print(self.get_neighbors())
 
     def _backup_seen(self):
         pass
@@ -251,8 +259,16 @@ class NetworkInterface:
     def _wait_timer_triggered(self):
         pass
 
-    def _neighbor_change(self):
-        pass
+    def _neighbor_change(self, changetype, values=None):
+        """Handling neighbor table"""
+        #TODO not ready at all
+        #Create new
+        if(changetype=="new"):
+            new_nb = Neighbor(self.next_neighbor_id)
+            self.next_neighbor_id += 1
+            if new_nb.new_neighbor("10.0.0.7"):
+                new_nb.set_neighbor_state(2) #Init
+                self._neighbors.append(new_nb)
 
     def _interface_down(self):
         pass
