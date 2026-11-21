@@ -49,10 +49,11 @@ class NetworkInterface:
             raise ValueError("ID must be an integer")
         self._interface_type = InterfaceType.BROADCAST
         self._interface_state = InterfaceState.DOWN
+        self._config_file = None
         self._ip_version = 4
         self._ip_address = "0.0.0.0"
         self._ip_mask = "0.0.0.0"
-        self._area_id = 0
+        self._area_id = 0 #Documentation says 32bit 0.0.0.0?
         self._hello_interval = 10
         self._router_dead_interval = 40
         self._router_priority = 0
@@ -72,6 +73,7 @@ class NetworkInterface:
     def new_interface(self, interface_type, ip_version, config_file, start_interface=False):
         """Method reads configuration data from given file and 
         checks all data is found before updating values. 
+        Start_interface defines if interface is turned up.
         If data is incorrect falls back to default values."""
 
         #Setting type and IP version
@@ -85,9 +87,10 @@ class NetworkInterface:
 
         #Reading values from config file
         config = configparser.ConfigParser()
-        config_file = Path(__file__).parent.parent / "config" / config_file
-        if not config.read(config_file):
-            raise FileNotFoundError(f"Config file not found: {config_file}")
+        self._config_file = config_file
+        config_path = Path(__file__).parent.parent / "config" / config_file
+        if not config.read(config_path):
+            raise FileNotFoundError(f"Config file not found: {config_path}")
 
         required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
@@ -231,28 +234,34 @@ class NetworkInterface:
     def receive_event(self, interface_event):
         pass
 
-    def stop_wait_timer(self):
-        self._wait_thread.set()
-
-    def _interface_up(self):
-        """Switching to UP status
-        Stop and remove old timers before starting new"""
-
-        #Remove old hello timer if exists
+    def delete_timers_and_threads(self):
+        """Stop and remove old timers and threads"""
+        #Remove Hello timer if exists
         if self._hello_timer:
             self._hello_timer.stop()
             self._hello_timer = None
-
-        #Create new timer
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
 
         #Remove old Hello thread if exists
         if self._hello_thread:
             self._hello_thread.join() #Wait for thread to finnish
 
-        #Remove old Wait thread if exists
+        #Remove Wait thread if exists
         if self._wait_thread:
-            self._wait_thread.join() #Wait for thread to finnish
+            self._wait_thread.set() #Wait for thread to finnish
+        return True
+
+    def stop_wait_timer(self):
+        self._wait_thread.set()
+
+    def _interface_up(self):
+        """Switching to UP status
+        Deleting old timers and threads before creating new.
+        Wait a dead router interval and then start sending Hello messages.
+        """
+        self.delete_timers_and_threads()
+
+        #Create new Hello timer
+        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
 
         #Set state to waiting
         self.set_interface_state(3)
@@ -264,9 +273,10 @@ class NetworkInterface:
         self._wait_thread.wait(timeout=self._router_dead_interval)
         if debug: print("Wait timer stops")
 
-        #If state has not changed from waiting something is wrong
-        if (self.get_interface_state()==InterfaceState.WAITING):
-            self._interface_down()
+        #TODO: Activate after Election works
+        # If state has not changed from waiting something is wrong
+        #if (self.get_interface_state()==InterfaceState.WAITING):
+        #    self._interface_down()
 
         #Create new thread and start
         self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
@@ -296,7 +306,9 @@ class NetworkInterface:
                 self._neighbors.append(new_nb)
 
     def _interface_down(self):
-        pass
+        """Set values to default. Stop timers and threads. Remove adjacensies."""
+        self.delete_timers_and_threads()
+        self.new_interface(2, 4, self._config_file, False)
 
     def _loop_ind(self):
         pass
