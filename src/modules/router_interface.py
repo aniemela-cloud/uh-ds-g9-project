@@ -60,7 +60,8 @@ class NetworkInterface:
         #Timers are set at method _interface_up()
         self._hello_timer = None
         self._hello_thread = None
-        self._wait_timer = None
+        #self._wait_timer = None
+        self._wait_thread = None
 
         self._designated_router = "0.0.0.0"        #IPAddress NOT READY
         self._backup_designated_router = "0.0.0.0" #IPAddress NOT READY
@@ -68,7 +69,7 @@ class NetworkInterface:
         self.next_neighbor_id = 1
         self._neighbors = [] #List of neighbor instances NOT READY
 
-    def new_interface(self, interface_type, ip_version, config_file):
+    def new_interface(self, interface_type, ip_version, config_file, start_interface=False):
         """Method reads configuration data from given file and 
         checks all data is found before updating values. 
         If data is incorrect falls back to default values."""
@@ -119,6 +120,9 @@ class NetworkInterface:
             self.set_router_priority(config.getint("router", "priority", fallback="0"))
         except ValueError:
             self.set_router_priority("0")
+
+        if start_interface:
+            self._interface_up()
 
 
     def get_id(self):
@@ -227,6 +231,9 @@ class NetworkInterface:
     def receive_event(self, interface_event):
         pass
 
+    def stop_wait_timer(self):
+        self._wait_thread.set()
+
     def _interface_up(self):
         """Switching to UP status
         Stop and remove old timers before starting new"""
@@ -239,20 +246,36 @@ class NetworkInterface:
         #Create new timer
         self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
 
-        #Remove old thread if exists
+        #Remove old Hello thread if exists
         if self._hello_thread:
             self._hello_thread.join() #Wait for thread to finnish
+
+        #Remove old Wait thread if exists
+        if self._wait_thread:
+            self._wait_thread.join() #Wait for thread to finnish
+
+        #Set state to waiting
+        self.set_interface_state(3)
+        self._wait_thread = threading.Event()
+
+        # Waiting timer
+        # Can be stopped by calling stop_wait_timer()
+        if debug: print("Wait timer starts: ", self._router_dead_interval)
+        self._wait_thread.wait(timeout=self._router_dead_interval)
+        if debug: print("Wait timer stops")
+
+        #If state has not changed from waiting something is wrong
+        if (self.get_interface_state()==InterfaceState.WAITING):
+            self._interface_down()
 
         #Create new thread and start
         self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
         self._hello_thread.start()
 
-        self._wait_timer = None              #Timer NOT READY
-
         #Test to add one neighbor
         if debug:
             self._neighbor_change("new", None)
-            print(self.get_neighbors())
+            print("List of neighbors: ", self.get_neighbors())
 
     def _backup_seen(self):
         pass
@@ -264,7 +287,8 @@ class NetworkInterface:
         """Handling neighbor table"""
         #TODO not ready at all
         #Create new
-        if(changetype=="new"):
+        if debug: print("Neighbor change\n")
+        if(changetype=="new" and len(self._neighbors)==0):
             new_nb = Neighbor(self.next_neighbor_id)
             self.next_neighbor_id += 1
             if new_nb.new_neighbor("10.0.0.7"):
