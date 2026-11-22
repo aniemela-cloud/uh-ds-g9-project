@@ -274,6 +274,7 @@ class NetworkInterface:
         Wait while dead router interval and then start sending
         and receiving Hello messages.
         """
+        #Delete all ghost timers and threads
         self.delete_timers_and_threads()
 
         #Set state to waiting
@@ -310,10 +311,11 @@ class NetworkInterface:
         self._receive_hello_thread.start()
 
         #Test to add one neighbor
-        #TODO remove after Neighbors are ready
+        #TODO remove after Messages and Neighbors are running
         if debug:
             self._neighbor_change("new", None)
             print("List of neighbors: ", self.get_neighbors())
+            print("IDs", self.get_neighbor_ids())
 
     def _interface_down(self):
         """Set values to default. Stop timers and threads. Remove adjacensies."""
@@ -353,7 +355,7 @@ class NetworkInterface:
         #TODO Improve eg. add validation that appends only active neighbors based on NeighborState
         neighbor_ids = []
         for member in self._neighbors:
-             neighbor_ids.append(member.get_id())
+             neighbor_ids.append(member.get_neighbor_id())
         return neighbor_ids
 
     def get_neighbors(self)->list:
