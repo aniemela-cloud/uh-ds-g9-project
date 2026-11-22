@@ -66,13 +66,15 @@ class TestRouterInterface(unittest.TestCase):
 
     @patch("modules.router_interface.threading.Thread")
     def test_interface_up_starts_thread(self, mock_thread):
-        """Bringing the interface up starts the hello timer thread"""
-        mock_thread_instance = MagicMock()
-        mock_thread.return_value = mock_thread_instance
+        """Bringing the interface up starts the hello send and receive threads"""
+        mock_thread1 = MagicMock()
+        mock_thread2 = MagicMock()
+        mock_thread.side_effect = [mock_thread1, mock_thread2]
         self.nw_if.set_router_dead_interval(1)
         self.nw_if.set_hello_interval(2)
         self.nw_if._interface_up()
-        mock_thread_instance.start.assert_called_once()
+        mock_thread1.start.assert_called_once()
+        mock_thread2.start.assert_called_once()
 
     def test_valid_designated_router(self):
         self.nw_if.set_designated_router("10.0.0.3")

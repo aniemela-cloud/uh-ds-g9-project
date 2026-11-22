@@ -10,11 +10,11 @@ net_if.new_interface(2, 4, config_file, True) #interface_type, ip_version, confi
 #time.sleep(60)
 
 #Option 2: test looping until keyboard interrupt:
-#try:
+# try:
 #    while True:
 #        pass
-#except KeyboardInterrupt:
-#    net_if._hello_timer.stop()
+# except KeyboardInterrupt:
+#    net_if._interface_down()
 
 #Test that interface is up and has values:
 #net_if.sayhello()
