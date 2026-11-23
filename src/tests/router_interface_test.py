@@ -22,7 +22,7 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual("192.168.1.10", self.nw_if.get_address())
         self.assertEqual("255.255.255.0", self.nw_if.get_mask())
         self.assertEqual(65435, self.nw_if.get_port())
-        self.assertEqual("192.168.1.12", self.nw_if.get_broadcast_ip())
+        self.assertEqual("192.168.1.12", self.nw_if.get_destination_ip())
         self.assertEqual(2, self.nw_if.get_hello_interval())
         self.nw_if.set_router_dead_interval("5") #Integer conversion
         self.assertEqual(5, self.nw_if.get_router_dead_interval())

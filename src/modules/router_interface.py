@@ -56,7 +56,7 @@ class NetworkInterface:
         self._ip_address = "0.0.0.0"
         self._ip_mask = "0.0.0.0"
         self._port = None
-        self._broadcast_ip = "0.0.0.0" # Destination
+        self._destination_ip = "0.0.0.0"
         self._area_id = 0 #Documentation says 32bit 0.0.0.0?
         self._hello_interval = 10
         self._router_dead_interval = 40
@@ -97,7 +97,7 @@ class NetworkInterface:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"), 
-                    ("network", "port"), ("network", "broadcast"),
+                    ("network", "port"), ("network", "destination"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
 
         for section, key in required:
@@ -117,9 +117,9 @@ class NetworkInterface:
         except ValueError:
             self.set_port(None)
         try:
-            self.set_broadcast_ip(config.get("network", "broadcast", fallback="0.0.0.0"))
+            self.set_destination_ip(config.get("network", "destination", fallback="0.0.0.0"))
         except ValueError:
-            self.set_broadcast_ip("0.0.0.0")
+            self.set_destination_ip("0.0.0.0")
 
         try:
             self.set_area_id(config.getint("network", "area_id", fallback="0"))
@@ -188,14 +188,14 @@ class NetworkInterface:
     def get_port(self) -> int:
         return self._port
 
-    def set_broadcast_ip(self, broadcast:str) -> bool:
-        if is_valid_ip(broadcast):
-            self._broadcast_ip = broadcast
+    def set_destination_ip(self, destination:str) -> bool:
+        if is_valid_ip(destination):
+            self._destination_ip = destination
             return True
         return False
 
-    def get_broadcast_ip(self) -> int:
-        return self._broadcast_ip
+    def get_destination_ip(self) -> int:
+        return self._destination_ip
 
     def get_mask(self) -> str:
         return self._ip_mask
@@ -373,10 +373,10 @@ class NetworkInterface:
 
     def _send_hello(self):
         """Triggers Message class to send a Hello message"""
-        if debug: print("Sending hello from ", self._ip_address, ":", self._port, "to", self._broadcast_ip)
+        if debug: print("Sending hello from ", self._ip_address, ":", self._port, "to", self._destination_ip)
         message = HelloMessage.from_interface(self, self.id)
         message_bytes = message.to_bytes()
-        self._networkconnection.send_message((self._broadcast_ip,self._port), message_bytes)
+        self._networkconnection.send_message((self._destination_ip,self._port), message_bytes)
 
     def _receive_hello(self, connection):
         """Based on received message
@@ -456,7 +456,7 @@ class NetworkInterface:
             f"IP address: {self._ip_address}\n"
             f"IP mask: {self._ip_mask}\n"
             f"Port: {self._port}\n"
-            f"Broadcast IP: {self._broadcast_ip}\n"
+            f"Destination IP: {self._destination_ip}\n"
             f"Interval hello: {self._hello_interval}\n"
             f"Interval dead router: {self._router_dead_interval}\n"
             f"Router priority: {self._router_priority}\n"
