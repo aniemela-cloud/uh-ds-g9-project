@@ -1,6 +1,7 @@
 from enum import Enum
 from pathlib import Path
 import configparser
+import time
 import threading
 from modules.message import HelloMessage
 import ipaddress
@@ -8,7 +9,7 @@ from modules.periodic_timer import PeriodicTimer
 from modules.router_neighbor import Neighbor, NeighborState
 from modules.router_connection import SocketConnection
 
-debug = 0 #Set to 1 for debugging / Add one neighbor at start
+debug = 1 #Set to 1 for debugging 
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -55,17 +56,17 @@ class NetworkInterface:
         self._ip_address = "0.0.0.0"
         self._ip_mask = "0.0.0.0"
         self._port = None
+        self._broadcast_ip = "0.0.0.0" # Destination
         self._area_id = 0 #Documentation says 32bit 0.0.0.0?
         self._hello_interval = 10
         self._router_dead_interval = 40
         self._router_priority = 0
+        self._networkconnection = None
 
         #Timers are set at method _interface_up()
         self._hello_timer = None
-        self._hello_thread = None
-        self._wait_thread = None
+        self._wait_timer = None
         self._receive_hello_timer = None
-        self._receive_hello_thread = None
 
         self._designated_router = "0.0.0.0"
         self._backup_designated_router = "0.0.0.0"
@@ -96,7 +97,7 @@ class NetworkInterface:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"), 
-                    ("network", "port"),
+                    ("network", "port"), ("network", "broadcast"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
 
         for section, key in required:
@@ -116,6 +117,11 @@ class NetworkInterface:
         except ValueError:
             self.set_port(None)
         try:
+            self.set_broadcast_ip(config.get("network", "broadcast", fallback="0.0.0.0"))
+        except ValueError:
+            self.set_broadcast_ip("0.0.0.0")
+
+        try:
             self.set_area_id(config.getint("network", "area_id", fallback="0"))
         except ValueError:
             self.set_area_id("0")
@@ -131,6 +137,9 @@ class NetworkInterface:
             self.set_router_priority(config.getint("router", "priority", fallback="0"))
         except ValueError:
             self.set_router_priority("0")
+
+        #Create Socket
+        self._networkconnection = SocketConnection()
 
         #Starting the interface
         if start_interface:
@@ -178,6 +187,15 @@ class NetworkInterface:
 
     def get_port(self) -> int:
         return self._port
+
+    def set_broadcast_ip(self, broadcast:str) -> bool:
+        if is_valid_ip(broadcast):
+            self._broadcast_ip = broadcast
+            return True
+        return False
+
+    def get_broadcast_ip(self) -> int:
+        return self._broadcast_ip
 
     def get_mask(self) -> str:
         return self._ip_mask
@@ -254,99 +272,111 @@ class NetworkInterface:
 
     #Methods for running and timers
 
-    def delete_timers_and_threads(self)->bool:
-        """Stop and remove old timers and threads"""
-        #Remove Wait thread if exists
-        if self._wait_thread:
-            self._wait_thread.set() #Wait for thread to finnish
-
-        #Remove Hello timer if exists
-        if self._hello_timer:
-            self._hello_timer.stop()
-            self._hello_timer = None
-
-        #Remove Hello thread if exists
-        if self._hello_thread:
-            self._hello_thread.join() #Wait for thread to finnish
-
-        #Remove Receive Hello timer if exists
-        if self._receive_hello_timer:
-            self._receive_hello_timer.stop()
-            self._receive_hello_timer = None
-
-        #Remove Receive Hello thread if exists
-        if self._receive_hello_thread:
-            self._receive_hello_thread.join() #Wait for thread to finnish
-
-        return True
-
     def stop_wait_timer(self)->bool:
         """Stops router dead interval timer before it expires"""
-        self._wait_thread.set()
+        self._wait_timer = None
         return True
 
     def _interface_up(self):
-        """Switching Interface to running status: DR, BR, DROTHER
-        First deleting old timers and threads before creating new.
-        Wait while dead router interval and then start sending
-        and receiving Hello messages.
+        """Looping Interface based on its status.
+        Each status case calls methods it should be running.
         """
-        #Delete all ghost timers and threads
-        self.delete_timers_and_threads()
+        print("Interface is getting up")
+        if debug: state_log = self._interface_state
 
-        #Set state to waiting
-        self.set_interface_state(3)
-        self._wait_thread = threading.Event()
+        while True:
+            if debug:
+                #Print the state changes
+                if state_log!=self._interface_state: 
+                    print("InterfaceStatus: ", self._interface_state.name)
+                    state_log = self._interface_state
 
-        # Waiting timer
-        # Can be stopped by calling stop_wait_timer()
-        if debug: print("Wait timer starts: ", self._router_dead_interval)
-        self._wait_thread.wait(timeout=self._router_dead_interval)
-        if debug: print("Wait timer stops")
+            match self._interface_state:
+                case InterfaceState.DOWN:
 
-        #TODO: Activate these after Election works
-        # If state has not changed from waiting something is wrong
-        #if (self.get_interface_state()==InterfaceState.WAITING):
-        #    self._interface_down()
+                    #Connect Networkconnection thingy
+                    if debug: print("Attempting connect_network on ",(self.get_address(),self._port))
+                    if not self._networkconnection.connect_network((self.get_address(),self._port)):
+                        ### Something went badly wrong
+                        raise Exception("oh no the network did not connect")
+                    
+                    self.set_interface_state(InterfaceState.WAITING)
+                    self._wait_timer = time.monotonic() + self._router_dead_interval
 
-        #Create new Hello timer
-        #TODO: Change from Mockup method to _receive_hello
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-#        self._hello_timer = PeriodicTimer(self._hello_interval, self._send_hello)
+                case InterfaceState.LOOPBACK:
+                    pass
 
-        #Create new Hello thread and start sending hello messages
-        self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
-        self._hello_thread.start()
+                case InterfaceState.POINTTOPOINT:
+                    pass
 
-        #Create new Receive Hello timer
-        #TODO: Change from Mockup method to _receive_hello
-#        self._receive_hello_timer = PeriodicTimer(self._hello_interval, self._receive_hello)
-        self._receive_hello_timer = PeriodicTimer(self._hello_interval, self.sayhello2)
+                case InterfaceState.WAITING:
+                    # Get messages
+                    #TODO if socket.check_messages:
+                        # Received message 
+                        # if it includes DR/BAckup changes status to DROTHER
+                        # Or it runs election which changes status to
+                        # either DR, DR_OTHER, or Backup
 
-        #Create new Receive Hello thread and start receiving Hello messages
-        self._receive_hello_thread = threading.Thread(target=self._receive_hello_timer.start, daemon=True)
-        self._receive_hello_thread.start()
+                    # Check if wait timer has expired
+                    if time.monotonic() >= self._wait_timer:
+                        #TODO run election
+                        # the run_election_stuff will assign us a state
+                        # either DR, DR_OTHER, or Backup
 
-        #Test to add one neighbor
-        #TODO remove after Messages and Neighbors are running
-        if debug:
-            self._neighbor_change("new", None)
-            print("List of neighbors: ", self.get_neighbors())
-            print("IDs", self.get_neighbor_ids())
+                        #Before election, this changes to next status
+                        if debug: self.set_interface_state(InterfaceState.DROTHER)
+                        pass
+
+                    #In case state changed, initialize Hello timer
+                    if self._interface_state != InterfaceState.WAITING:
+                        self._hello_timer = time.monotonic() + self._hello_interval
+
+                case InterfaceState.DROTHER | InterfaceState.BACKUP | InterfaceState.DR:
+                    # First, we send out hello if the interval has expired
+                    if time.monotonic() >= self._hello_timer:
+                        if debug: print("Time to send a hello...")
+                        self._send_hello()
+                        # Reset timer
+                        self._hello_timer = time.monotonic() + self._hello_interval
+                        if debug:
+                            print("Sent message")
+                            break #Stop to send only one message
+
+                    # Second, we take in one message if there are any
+                    if self._networkconnection.check_message():
+                    #    process_message(socket.get_message)
+                    # Status can change based on processing
+                        pass 
+
+                        #Third, we check if any neighbor has died
+                        for nb in self._neighbors:
+                        #    neighbor.check_wait_timer
+                            pass
+
+                    #if no messages, sleep for a second
+                    else:
+                        if debug: print("Sleeping")
+                        time.sleep(10)
+
+                case _:
+                    raise Exception("Interface is stateless")
+
 
     def _interface_down(self):
-        """Set values to default. Stop timers and threads. Remove adjacensies."""
-        self.delete_timers_and_threads()
+        """Set values to default. Stop timers. Remove adjacensies."""
+        self._wait_timer = None
+        self._hello_timer = None
         self.new_interface(2, 4, self._config_file, False)
 
 
     #Methods for Hello messages
 
-    def _send_hello(self, connection, destination, router_id):
+    def _send_hello(self):
         """Triggers Message class to send a Hello message"""
-        message = HelloMessage.from_interface(self, router_id)
+        if debug: print("Sending hello from ", self._ip_address, ":", self._port, "to", self._broadcast_ip)
+        message = HelloMessage.from_interface(self, self.id)
         message_bytes = message.to_bytes()
-        connection.send_message(destination, message_bytes)
+        self._networkconnection.send_message((self._broadcast_ip,self._port), message_bytes)
 
     def _receive_hello(self, connection):
         """Based on received message
@@ -422,9 +452,11 @@ class NetworkInterface:
         return (
             f"ID: {self.id}\n"
             f"Interface type: {self._interface_type}\n"
-            f"Interface status: {self._interface_state}\n"
+            f"Interface status: {self._interface_state.name}\n"
             f"IP address: {self._ip_address}\n"
             f"IP mask: {self._ip_mask}\n"
+            f"Port: {self._port}\n"
+            f"Broadcast IP: {self._broadcast_ip}\n"
             f"Interval hello: {self._hello_interval}\n"
             f"Interval dead router: {self._router_dead_interval}\n"
             f"Router priority: {self._router_priority}\n"

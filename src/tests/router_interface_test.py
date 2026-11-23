@@ -22,6 +22,7 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual("192.168.1.10", self.nw_if.get_address())
         self.assertEqual("255.255.255.0", self.nw_if.get_mask())
         self.assertEqual(65435, self.nw_if.get_port())
+        self.assertEqual("192.168.1.12", self.nw_if.get_broadcast_ip())
         self.assertEqual(2, self.nw_if.get_hello_interval())
         self.nw_if.set_router_dead_interval("5") #Integer conversion
         self.assertEqual(5, self.nw_if.get_router_dead_interval())
@@ -65,17 +66,6 @@ class TestRouterInterface(unittest.TestCase):
         self.nw_if.set_router_priority("a") #Integer
         self.assertEqual(0, self.nw_if.get_area_id()) #default 0
 
-    @patch("modules.router_interface.threading.Thread")
-    def test_interface_up_starts_thread(self, mock_thread):
-        """Bringing the interface up starts the hello send and receive threads"""
-        mock_thread1 = MagicMock()
-        mock_thread2 = MagicMock()
-        mock_thread.side_effect = [mock_thread1, mock_thread2]
-        self.nw_if.set_router_dead_interval(1)
-        self.nw_if.set_hello_interval(2)
-        self.nw_if._interface_up()
-        mock_thread1.start.assert_called_once()
-        mock_thread2.start.assert_called_once()
 
     def test_valid_designated_router(self):
         self.nw_if.set_designated_router("10.0.0.3")

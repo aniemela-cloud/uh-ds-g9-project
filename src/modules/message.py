@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+debug = 1 # Set to 1 for testing the sending of message
+
 @dataclass
 class HelloMessage:
     router_id: str
@@ -28,7 +30,11 @@ class HelloMessage:
             neighbors=interface.get_neighbor_ids(),
         )
     def to_bytes(self) -> bytes:
+        #Returns bytestring for testing
+        if debug:
+            return b"helloworld"
         raise NotImplementedError("Hello message encoding is not implemented yet")
+
     @classmethod
     def from_bytes(cls, data: bytes):
         raise NotImplementedError("Hello message decoding is not implemented yet")
