@@ -105,7 +105,7 @@ class SocketConnection(NetworkConnection):
         Functions otherwise like connect_network().
         """
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.bind(if_address)
         return True
     
@@ -206,6 +206,7 @@ first on SocketConnection.") # Throw some error
         dot notation, e.g. '192.168.1.99' (and can be a multicast address)
         Raises an exception if the underlying socket has not been connected.
         """
+        #print("In socketconnection send_message sending to ",dest_address)
         if self._sock is None:
             raise Exception("Attempted to send message without connecting \
 first on SocketConnection.") # Throw some error

@@ -9,7 +9,7 @@ from modules.router_neighbor import Neighbor, NeighborState
 from modules.router_connection import SocketConnection
 
 debug = 0 #Set to 1 for debugging / Add one neighbor at start
-DEFAULT_PORT = 24378
+DEFAULT_PORT = 65435
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -316,11 +316,11 @@ class NetworkInterface:
         #Create new Receive Hello timer
         #TODO: Change from Mockup method to _receive_hello
 #        self._receive_hello_timer = PeriodicTimer(self._hello_interval, self._receive_hello)
-        self._receive_hello_timer = PeriodicTimer(self._hello_interval, self.sayhello2)
+#        self._receive_hello_timer = PeriodicTimer(self._hello_interval, self.sayhello2)
 
         #Create new Receive Hello thread and start receiving Hello messages
-        self._receive_hello_thread = threading.Thread(target=self._receive_hello_timer.start, daemon=True)
-        self._receive_hello_thread.start()
+#        self._receive_hello_thread = threading.Thread(target=self._receive_hello_timer.start, daemon=True)
+#        self._receive_hello_thread.start()
 
         #Test to add one neighbor
         #TODO remove after Messages and Neighbors are running
@@ -337,14 +337,14 @@ class NetworkInterface:
         self.new_interface(2, 4, self._config_file, False)
 
 
-    #Methods for Hello messages
+    #Methods for Hello messagess
 
-    def _send_hello(self, connection, destination, router_id):
+    def _send_hello(self):
         """Triggers Message class to send a Hello message"""
-        print("Sending hello from ",router_id)
-        message = HelloMessage.from_interface(self, router_id)
+        #print("Sending hello from ",112)
+        message = HelloMessage.from_interface(self, 1)
         message_bytes = message.to_bytes()
-        self._networkconnection.send_message(("127.0.0.1",DEFAULT_PORT), message_bytes)
+        self._networkconnection.send_message(("10.112.28.0",DEFAULT_PORT), message_bytes)
 
     def _receive_hello(self, connection):
         """Based on received message
