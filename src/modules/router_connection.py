@@ -105,6 +105,7 @@ class SocketConnection(NetworkConnection):
         Functions otherwise like connect_network().
         """
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
         self._sock.bind(if_address)
         return True
     

@@ -6,8 +6,10 @@ from modules.message import HelloMessage
 import ipaddress
 from modules.periodic_timer import PeriodicTimer
 from modules.router_neighbor import Neighbor, NeighborState
+from modules.router_connection import SocketConnection
 
 debug = 0 #Set to 1 for debugging / Add one neighbor at start
+DEFAULT_PORT = 24378
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -57,6 +59,7 @@ class NetworkInterface:
         self._hello_interval = 10
         self._router_dead_interval = 40
         self._router_priority = 0
+        self._networkconnection = None
 
         #Timers are set at method _interface_up()
         self._hello_timer = None
@@ -124,7 +127,7 @@ class NetworkInterface:
             self.set_router_priority(config.getint("router", "priority", fallback="0"))
         except ValueError:
             self.set_router_priority("0")
-
+        self._networkconnection = SocketConnection()
         #Starting the interface
         if start_interface:
             self._interface_up()
@@ -152,6 +155,10 @@ class NetworkInterface:
     def set_address(self, ip_address:str, ip_mask:str):
         """Set IP address and mask, validate given values"""
         if( (is_valid_ip(ip_address)) & (is_valid_network(ip_mask)) ):
+            if(self._ip_address != ip_address):
+                if self._networkconnection != None:
+                    self._networkconnection.dispose()
+                    self._networkconnection = None
             self._ip_address = ip_address
             self._ip_mask = ip_mask
         return False
@@ -277,8 +284,13 @@ class NetworkInterface:
         #Delete all ghost timers and threads
         self.delete_timers_and_threads()
 
+        #Connect Networkconnection thingy
+        print("attempting connect_network on ",(self.get_address(),DEFAULT_PORT))
+        if not self._networkconnection.connect_network((self.get_address(),DEFAULT_PORT)):
+            ### Something went badly wrong
+            raise Exception("oh no the network did not connect")
         #Set state to waiting
-        self.set_interface_state(3)
+        self.set_interface_state(InterfaceState.WAITING)
         self._wait_thread = threading.Event()
 
         # Waiting timer
@@ -294,8 +306,8 @@ class NetworkInterface:
 
         #Create new Hello timer
         #TODO: Change from Mockup method to _receive_hello
-        self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
-#        self._hello_timer = PeriodicTimer(self._hello_interval, self._send_hello)
+        #self._hello_timer = PeriodicTimer(self._hello_interval, self.sayhello)
+        self._hello_timer = PeriodicTimer(self._hello_interval, self._send_hello)
 
         #Create new Hello thread and start sending hello messages
         self._hello_thread = threading.Thread(target=self._hello_timer.start, daemon=True)
@@ -320,6 +332,8 @@ class NetworkInterface:
     def _interface_down(self):
         """Set values to default. Stop timers and threads. Remove adjacensies."""
         self.delete_timers_and_threads()
+        if self._networkconnection != None:
+            self._networkconnection.dispose()
         self.new_interface(2, 4, self._config_file, False)
 
 
@@ -327,9 +341,10 @@ class NetworkInterface:
 
     def _send_hello(self, connection, destination, router_id):
         """Triggers Message class to send a Hello message"""
+        print("Sending hello from ",router_id)
         message = HelloMessage.from_interface(self, router_id)
         message_bytes = message.to_bytes()
-        connection.send_message(destination, message_bytes)
+        self._networkconnection.send_message(("127.0.0.1",DEFAULT_PORT), message_bytes)
 
     def _receive_hello(self, connection):
         """Based on received message

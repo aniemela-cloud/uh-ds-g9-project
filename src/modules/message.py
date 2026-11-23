@@ -28,7 +28,8 @@ class HelloMessage:
             neighbors=interface.get_neighbor_ids(),
         )
     def to_bytes(self) -> bytes:
-        raise NotImplementedError("Hello message encoding is not implemented yet")
+        return b"helloworld"
+        # raise NotImplementedError("Hello message encoding is not implemented yet")
     @classmethod
     def from_bytes(cls, data: bytes):
         raise NotImplementedError("Hello message decoding is not implemented yet")
