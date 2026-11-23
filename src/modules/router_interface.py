@@ -6,6 +6,7 @@ from modules.message import HelloMessage
 import ipaddress
 from modules.periodic_timer import PeriodicTimer
 from modules.router_neighbor import Neighbor, NeighborState
+from modules.router_connection import SocketConnection
 
 debug = 0 #Set to 1 for debugging / Add one neighbor at start
 
@@ -53,6 +54,7 @@ class NetworkInterface:
         self._ip_version = 4
         self._ip_address = "0.0.0.0"
         self._ip_mask = "0.0.0.0"
+        self._port = None
         self._area_id = 0 #Documentation says 32bit 0.0.0.0?
         self._hello_interval = 10
         self._router_dead_interval = 40
@@ -93,7 +95,8 @@ class NetworkInterface:
         if not config.read(config_path):
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
-        required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"),
+        required = [("network", "ip_address"), ("network", "ip_mask"), ("network", "area_id"), 
+                    ("network", "port"),
         ("interval", "hello"), ("interval", "dead"), ("router", "priority")]
 
         for section, key in required:
@@ -108,6 +111,10 @@ class NetworkInterface:
                                 config.get("network", "ip_mask", fallback="0.0.0.0"))
         except ValueError:
             self.set_address("0.0.0.0", "0.0.0.0")
+        try:
+            self.set_port(config.getint("network", "port", fallback=None))
+        except ValueError:
+            self.set_port(None)
         try:
             self.set_area_id(config.getint("network", "area_id", fallback="0"))
         except ValueError:
@@ -161,6 +168,16 @@ class NetworkInterface:
 
     def get_address(self) -> str:
         return self._ip_address
+
+    def set_port(self, port:int) -> bool:
+        try:
+            self._port = int(port)
+            return True
+        except ValueError:
+            return False
+
+    def get_port(self) -> int:
+        return self._port
 
     def get_mask(self) -> str:
         return self._ip_mask
