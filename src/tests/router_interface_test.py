@@ -15,15 +15,15 @@ class TestRouterInterface(unittest.TestCase):
 
     def test_valid_new_interface(self):
         """Setting initial values"""
-        self.nw_if.new_interface(1,4,"config_test.ini")
+        self.nw_if.new_interface(1,4,"config_test.ini", start_interface=False)
         self.assertEqual(InterfaceType.POINTTOPOINT, self.nw_if.get_interface_type())
         self.assertEqual(InterfaceState.DOWN, self.nw_if.get_interface_state())
         self.assertEqual(4, self.nw_if.get_ip_version())
         self.assertEqual("192.168.1.10", self.nw_if.get_address())
         self.assertEqual("255.255.255.0", self.nw_if.get_mask())
-        self.assertEqual(11, self.nw_if.get_hello_interval())
-        self.nw_if.set_router_dead_interval("200") #Integer conversion
-        self.assertEqual(200, self.nw_if.get_router_dead_interval())
+        self.assertEqual(2, self.nw_if.get_hello_interval())
+        self.nw_if.set_router_dead_interval("5") #Integer conversion
+        self.assertEqual(5, self.nw_if.get_router_dead_interval())
         self.assertEqual(8, self.nw_if.get_router_priority())
         self.assertEqual(2, self.nw_if.get_area_id())
 
@@ -64,14 +64,17 @@ class TestRouterInterface(unittest.TestCase):
         self.nw_if.set_router_priority("a") #Integer
         self.assertEqual(0, self.nw_if.get_area_id()) #default 0
 
-
     @patch("modules.router_interface.threading.Thread")
     def test_interface_up_starts_thread(self, mock_thread):
-        """Bringing the interface up starts the hello timer thread"""
-        mock_thread_instance = MagicMock()
-        mock_thread.return_value = mock_thread_instance
+        """Bringing the interface up starts the hello send and receive threads"""
+        mock_thread1 = MagicMock()
+        mock_thread2 = MagicMock()
+        mock_thread.side_effect = [mock_thread1, mock_thread2]
+        self.nw_if.set_router_dead_interval(1)
+        self.nw_if.set_hello_interval(2)
         self.nw_if._interface_up()
-        mock_thread_instance.start.assert_called_once()
+        mock_thread1.start.assert_called_once()
+        mock_thread2.start.assert_called_once()
 
     def test_valid_designated_router(self):
         self.nw_if.set_designated_router("10.0.0.3")

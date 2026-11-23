@@ -1,9 +1,9 @@
 from enum import Enum
 
 class NeighborState(Enum):
-    DOWN = 0 #default
+    DOWN = 0 
     ATTEMPT = 1
-    INIT = 2
+    INIT = 2 #default when creating new
     TWO_WAY = 3
     EXSTART = 4
     EXCHANGE = 5
@@ -17,7 +17,7 @@ class Neighbor:
             self.neighbor_id = int(given_id)
         except ValueError:
             raise ValueError("ID must be an integer")
-        self._neighbor_state= NeighborState.DOWN
+        self._neighbor_state= NeighborState.INIT
         self._ip_address = "0.0.0.0"
         self._priority = 0
         self._designated_router = "0.0.0.0"
@@ -35,52 +35,59 @@ class Neighbor:
             return True
         return False
 
-    def set_neighbor_state(self, state):
-        """Switches state, state is given as integer"""
+    def get_neighbor_id(self)->int:
+        return self.neighbor_id
+
+    def set_neighbor_state(self, state:int)->bool:
+        """Switches state"""
         try:
             self._neighbor_state = NeighborState(state)
+            return True
         except ValueError:
             return False
 
-    def get_neighbor_state(self):
+    def get_neighbor_state(self)->NeighborState:
         return self._neighbor_state
 
-    def set_address(self, ip_address):
+    def set_address(self, ip_address:str):
         """Set IP address. Validated at NetworkInterface"""
         if ip_address:
             self._ip_address = ip_address
             return True
         return False
 
-    def get_address(self):
+    def get_address(self)->str:
         return self._ip_address
 
-    def set_priority(self, priority):
+    def set_priority(self, priority:int)->bool:
         try:
             value = int(priority)
-            if not 1 <= value <= 17000: # Min and Max
+            if not 0 <= value <= 17000: # Min and Max
                 return False
             self._priority = value
+            return True
         except ValueError:
             return False
 
-    def get_priority(self):
+    def get_priority(self)->int:
         return self._priority
 
-    def set_designated_router(self, designated_router):
+    def set_designated_router(self, designated_router:str)->bool:
         if designated_router:
             self._designated_router = designated_router
+            return True
         return False
 
-    def get_designated_router(self):
+    def get_designated_router(self)->str:
         return self._designated_router
 
-    def set_backup_router(self, backup_router):
+    def set_backup_router(self, backup_router:str)->bool:
         if backup_router:
             self._backup_designated_router = backup_router
+            return True
         return False
 
-    def get_backup_router(self):
+    def get_backup_router(self)->str:
         return self._backup_designated_router
 
     def receive_event(self, neighbor_event):

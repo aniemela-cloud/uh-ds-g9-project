@@ -25,8 +25,7 @@ class HelloMessage:
             router_dead_interval=interface.get_router_dead_interval(),
             designated_router=interface.get_designated_router(),
             backup_designated_router=interface.get_backup_router(),
-            # TODO: Replace IP addresses with recently heard neighbor router IDs.
-            neighbors=interface.get_neighbors(),
+            neighbors=interface.get_neighbor_ids(),
         )
     def to_bytes(self) -> bytes:
         raise NotImplementedError("Hello message encoding is not implemented yet")
