@@ -42,6 +42,26 @@ def is_valid_network(network):
         return False
 
 class NetworkInterface:
+    class _ElectionMember():
+        """ A simple data class for the (backup) designated router election.
+        """
+        def __init__(self, router_id: int, priority: int, ip_address: str, 
+                     designated_router: str, backup_router: str):
+            self.router_id = router_id
+            self.priority = priority
+            self.ip_address = ip_address
+            self.designated_router = designated_router
+            self.backup_router = backup_router
+        
+        def __str__(self):
+            return (
+                "_ElectionMember:"
+                f"Router priority: {self.priority}\n"
+                f"IP address {self.ip_address}\n"
+                f"Reported designated router {self.designated_router}\n"
+                f"Reported backup router {self.backup_router}\n"
+            )
+
     def __init__(self, given_id:int):
         try:
             self.id = int(given_id)
@@ -382,6 +402,200 @@ class NetworkInterface:
 
     def _backup_seen(self):
         pass
+
+    def _run_election(self):
+        """Runs the OSPF Designated Router election.
+        
+        Reference: https://www.rfc-editor.org/info/rfc2328/#page-75
+        """
+        # Store the current (backup) designated router for use later
+        current_dr = self.get_designated_router()
+        current_bdr = self.get_backup_router()
+        
+        # List of eligible routers (in general), that is, routers in the
+        # 2-Way state that have router priority != 0, plus this router 
+        # (assuming this router's router priority != 0)
+        valid_list = []
+        thisRouter = None
+        if self.get_router_priority() > 0:
+            # Start with this router, saving the _ElectionMember reference for 
+            # later
+            thisRouter = _ElectionMember(
+                self.id,
+                self._router_priority,
+                self._ip_address,
+                self._designated_router,
+                self._backup_designated_router,
+            )
+            valid_list.append(thisRouter)
+        
+        # Iterate through neighbors, adding eligible ones
+        for member in self._neighbors:
+            # Skip if the state is not at least 2-Way
+            if member.get_neighbor_state() < NeighborState.TWO_WAY:
+                continue
+            # Skip if the router priority indicates the neighbor does not
+            # want to be a (B)DR
+            if member.get_router_priority() == 0:
+                continue
+            # Otherwise the neighbor is eligible, and we add it to the
+            # list:
+            valid_list.append(
+                _ElectionMember(member.get_neighbor_id(),
+                                member.get_router_priority(),
+                                member.get_address(),
+                                member.get_designated_router(),
+                                member.get_backup_router()))
+        # First we try to get a backup designated router selected
+        # from the list of eligible candidates:
+        maybe_backup = self._elect_backup(valid_list)
+        maybe_designated = self._elect_designated(valid_list)
+        
+        # The backup election *must* find a prospective backup router. If none
+        # is found, it means there are no routers in the network that we have
+        # 2-Way with AND this router itself is ineligible to be the backup.
+        if maybe_backup is None:
+            raise Exception("Election error: No eligible routers found.")
+            # We can think of using some other method for communicating the
+            # failure later.
+        
+        # It is possible the DR election does not find a DR, because no router
+        # has declared itself as the DR.
+        if maybe_designated is None:
+            # In this case we select the found backup DR as the actual DR,
+            # basically "promoting" it.
+            maybe_designated = maybe_backup
+        
+        # Check whether this router was selected as the DR through the above
+        # AND that this router was NOT the DR before the calculations
+        # + Same check for BDR
+        if (self.id == maybe_designated.id and current_dr != self._ip_address) or \
+            (self.id == maybe_backup.id and current_bdr != self._ip_address):
+            if thisRouter is None:
+                raise Exception("Election error: This router was selected as the (B)DR even though this router should not be eligible.")
+            # We assign the DR/BDR IP addresses to this router's _ElectionMember
+            # instance, so that in case it used to be the BDR and was elected
+            # DR, it will be disqualified from the BDR selection
+            thisRouter.designated_router = maybe_designated.ip_address
+            thisRouter.backup_router = maybe_backup.ip_address
+            maybe_backup = self._elect_backup(valid_list)
+            maybe_designated = self._elect_designated(valid_list)
+        
+        # We now should have a designated router and backup designated router
+        # selected. If we have somehow failed to find either, we assign
+        # 0.0.0.0 as the DR/BDR address
+        if maybe_backup is None:
+            self.set_backup_router("0.0.0.0")
+        else:
+            self.set_backup_router(maybe_backup.ip_address)
+        if maybe_designated is None:
+            self.set_designated_router("0.0.0.0")
+        else:
+            self.set_designated_router(maybe_designated.ip_address)
+        
+        if self.get_designated_router() == self.get_address():
+            self.set_interface_state(InterfaceState.DR)
+        elif self.get_backup_router() == self.get_address():
+            self.set_interface_state(InterfaceState.BACKUP)
+        else:
+            self.set_interface_state(InterfaceState.DROTHER)
+        
+    def _elect_backup(self, election_list:list[_ElectionMember])->_ElectionMember:
+        """ Helper method for finding the backup designated router.
+        
+        Iterates through the election_list according to rules for the backup
+        designated router selection for OSPFv2. 
+        """
+        # Note to self: This function could probably be abstracted so that
+        # we don't have to perform basically the exact same checks for 
+        # electing the *designated* router, but my brain isn't braining
+        # enough to figure out how to do that, since the algorithms
+        # check different members of the _ElectionMember objects. Don't have
+        # the time to figure it out so copy paste coding GO
+        
+        if type(election_list) is not list:
+            return None
+        if len(election_list) == 0:
+            return None
+        # Filter out all members in the list that have declared themselves
+        # as the _designated_ router
+        backup_list = [member for member in election_list 
+                       if member.designated_router != member.ip_address]
+        elected_backup = None
+        highest_prio = None
+        
+        for member in backup_list:
+            # We use this for loop to find the member with the highest
+            # router priority in case we need the information later. 
+            if highest_prio is None:
+                highest_prio = member
+            elif highest_prio.priority < member.priority:
+                highest_prio = member
+            elif highest_prio.priority == member.priority:
+                # Equal priorities, check router ID with higher
+                # winning
+                if highest_prio.router_id < member.router_id:
+                    highest_prio = member
+            
+            # Check what the member declared as it's backup DR
+            if member.backup_router == member.ip_address:
+                # The router has declared itself as the backup
+                if elected_backup is None:
+                    # There is currently no prospective election winner,
+                    # so this router declaring itself as backup gets the
+                    # spot
+                    elected_backup = member
+                elif elected_backup.priority < member.priority:
+                    # The currently prospective winner has lower priority
+                    # than this router, so this router gets the spot
+                    elected_backup = member
+                elif elected_backup.priority == member.priority:
+                    # Equal priorities, check router ID with higher
+                    # winning
+                    if elected_backup.router_id < member.router_id:
+                        elected_backup = member
+        
+        if elected_backup is None:
+            # The above iteration did not find a router that declares itself
+            # the backup designated router. We use the alternative method:
+            # Highest router priority wins (which is why we used the 
+            # for loop above to find that, too)
+            elected_backup = highest_prio
+        
+        return elected_backup
+    
+    def _elect_designated(self, election_list: list[_ElectionMember]) -> _ElectionMember:
+        if type(election_list) is not list:
+            return None
+        if len(election_list) == 0:
+            return None
+        
+        elected_router = None
+        
+        for member in election_list:
+            # Check what the member declared as it's DR
+            if member.designated_router == member.ip_address:
+                # The router has declared itself as the DR
+                if elected_router is None:
+                    # There is currently no prospective election winner,
+                    # so this router declaring itself as backup gets the
+                    # spot
+                    elected_router = member
+                elif elected_router.priority < member.priority:
+                    # The currently prospective winner has lower priority
+                    # than this router, so this router gets the spot
+                    elected_router = member
+                elif elected_router.priority == member.priority:
+                    # Equal priorities, check router ID with higher
+                    # winning
+                    if elected_router.router_id < member.router_id:
+                        elected_router = member
+        
+        # It's possible that the above election loop did not find a router
+        # that declares itself as the designated router, and thus no DR is
+        # found. elected_router can thus be None. This is fine, and the
+        # caller's problem, actually.
+        return elected_router
 
 #Methods with no use yet
 
