@@ -1,5 +1,5 @@
 from enum import Enum
-from time import time
+import time
 
 class NeighborState(Enum):
     DOWN = 0 
@@ -33,7 +33,7 @@ class Neighbor:
 
     def new_neighbor(self, ip_address):
         if self.set_address(ip_address):
-            print("New neighbor created, id:", self.neighbor_id, "IP:", self._ip_address)
+            print("Neighbor: New neighbor created, id:", self.neighbor_id, "IP:", self._ip_address)
             return True
         return False
 

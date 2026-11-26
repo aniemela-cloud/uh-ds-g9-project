@@ -393,7 +393,7 @@ class NetworkInterface:
 
     def receive_event(self, interface_event, message=None):
         """Actions based on events"""
-
+        if debug: print("\nEvent starts")
         if interface_event=="HelloReceived":
             self._handle_received_message(message)
         elif interface_event=="BackupSeen":
@@ -408,6 +408,7 @@ class NetworkInterface:
             self._handle_neighbor_dead()
         else:
             raise Exception("Unknown Interface Event")
+        if debug: print("End of event.")
 
 # Conditions for MESSAGE processing
 
@@ -450,7 +451,6 @@ class NetworkInterface:
         return (message.designated_router == self.get_designated_router() and message.backup_designated_router == self.get_backup_router())
 
 
-
 # Methods for MESSAGE HANDLING
 
     def _handle_received_message(self, message:HelloMessage):
@@ -466,24 +466,24 @@ class NetworkInterface:
 
         # After bootup waiting if network has already selected leaders
         if self._backup_seen_condition(message):
-            if debug: print("\tBackupSeen->>")
             self.receive_event("BackUpSeen", message)
 
         # Is the neighbor ID from new previously unknown router
         if self._new_neighbor_condition(message) or not self._neighbors:
             # Create new neighbor
-            if debug: print("NEW neighbor detected")
+            if debug: print("New neighbor detected")
             nb = Neighbor(message.router_id)
             self._neighbors.append(nb)
+            if debug: print("\tNeigbor created.")
 
             # Does it know this inteface or not
             if self._twoway_condition(message):
-                if debug: print("TRIGGER 2-WAY")
+                if debug: print("Trigger 2-WAY")
                 self.receive_event("2-WayReceived", message)
             else:
-                if debug: print("TRIGGER 1-WAY")
+                if debug: print("Trigger 1-WAY")
                 self.receive_event("1-WayReceived", message)
-
+            if debug: print("End of trigger")
             self.receive_event("NeighborChange", message)
 
         else:
@@ -518,15 +518,39 @@ class NetworkInterface:
         if debug: print("End of handling")
 
 
-    def _handle_backup_seen(self, message):
-        if debug: print("BackUpSeen is handled")
-        # TODO: not implemented yet
-        pass
+    def _handle_backup_seen(self, message:HelloMessage):
+        """While waiting message with leader info is received"""
+        if debug: print("BackUpSeen handling starts")
+        self.stop_wait_timer()
+        self.set_interface_state(InterfaceState.DROTHER)
+        #Create new neighbor
+        nb = Neighbor(message.router_id)
+        self._neighbors.append(nb)
+        #Save other data and then go towards election
+        #TODO Raises Election error: No eligible routers found.
+#        self._handle_neighbor_change(message)
 
     def _handle_neighbor_change(self, message: HelloMessage)->bool:
-        """Handling neighbor table"""
-        if debug: print("Neighbor change\n")
-        pass
+        """Updating changed neighbor data and triggering election"""
+        if debug: print("Neighbor change starts")
+        nb = self.get_neighbor(message.router_id)
+        if not isinstance(nb, Neighbor):
+            raise Exception("Non-existing neighbor.")
+        if nb.get_address() == "0.0.0.0":
+            #New neighbor
+            #TODO change ip
+            nb.new_neighbor(message.router_id)
+        #Update data
+        nb.set_priority(message.router_priority)
+        nb.set_designated_router(message.designated_router)
+        nb.set_backup_router(message.backup_designated_router)
+        #Update TTL
+        nb.set_timer()
+        #Run election with updated data
+        #TODO Exception: Election error: No eligible routers found
+#        self._run_election()
+        if debug: print("Election is done.")
+        return
 
     def _handle_twoway(self, message):
         nb = self.get_neighbor(message.router_id)

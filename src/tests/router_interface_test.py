@@ -10,7 +10,6 @@ from modules.router_neighbor import Neighbor, NeighborState
 class TestRouterInterface(unittest.TestCase):
     def setUp(self):
         self.nw_if = NetworkInterface(10)
-        
         self.msg_ok = HelloMessage(
         router_id=1,
         area_id=2,
@@ -95,20 +94,20 @@ class TestRouterInterface(unittest.TestCase):
         self.assertFalse(self.nw_if.set_backup_router("4"))
         self.assertFalse(self.nw_if.set_backup_router("vara"))
 
-    # def test_match_config_condition(self):
-    #     self.nw_if.new_interface(1,4,"config_test.ini", start_interface=False)
+    def test_match_config_condition(self):
+        self.nw_if.new_interface(1,4,"config_test.ini", start_interface=False)
 
-    #     msg_diff_values = HelloMessage(
-    #     router_id="192.168.1.12",
-    #     area_id=2,
-    #     network_mask="255.255.255.0",
-    #     hello_interval=2,
-    #     router_priority=2,
-    #     router_dead_interval=499
-    #     )
+        msg_diff_values = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=499
+        )
 
-    #     self.assertTrue(self.nw_if._match_config_condition(self.msg_ok))
-    #     self.assertFalse(self.nw_if._match_config_condition(msg_diff_values))
+        self.assertTrue(self.nw_if._match_config_condition(self.msg_ok))
+        self.assertFalse(self.nw_if._match_config_condition(msg_diff_values))
 
 
     def test_dr_backup_seen_condition(self):
@@ -254,13 +253,34 @@ class TestRouterInterface(unittest.TestCase):
         self.assertIn(1, self.nw_if.get_neighbor_ids())
 
     def test_handle_backup_seen(self):
-        pass
+        msg_dr = HelloMessage(
+        router_id=3,
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        designated_router= "192.168.1.55",
+        backup_designated_router= "10.10.10.10",
+        neighbors= [10,2,44]
+        )
+        self.nw_if._handle_backup_seen(msg_dr)
+        self.assertEqual(self.nw_if._interface_state, InterfaceState.DROTHER)
+        self.assertIn(3, self.nw_if.get_neighbor_ids())
 
     def test_handle_twoway(self):
-        pass
+        nb = Neighbor(1)
+        self.nw_if._neighbors.append(nb)
+        self.nw_if._handle_twoway(self.msg_ok)
+        self.assertEqual(nb.get_neighbor_state(), NeighborState.TWO_WAY)
 
     def test_handle_neighbor_change(self):
-        pass
+        nb = Neighbor(1)
+        self.nw_if._neighbors.append(nb)
+        self.assertEqual(nb.get_neighbor_id(),self.msg_ok.router_id)
+        self.nw_if._handle_neighbor_change(self.msg_ok)
+        nb = self.nw_if.get_neighbor(self.msg_ok.router_id)
+        self.assertEqual(nb.get_priority(),self.msg_ok.router_priority)
 
     def test_handle_neighbor_dead(self):
         pass
