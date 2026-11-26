@@ -12,20 +12,20 @@ class TestElection_SubElections(unittest.TestCase):
         self.interface = NetworkInterface(THIS_ROUTER_ID)
         self.thisRouter = \
         NetworkInterface._ElectionMember(
-            THIS_ROUTER_ID,
-            1,
-            THIS_ROUTER_ADDRESS,
-            "0.0.0.0",
-            "0.0.0.0")
+            router_id=THIS_ROUTER_ID,
+            priority=1,
+            ip_address=THIS_ROUTER_ADDRESS,
+            designated_router="0.0.0.0",
+            backup_router="0.0.0.0")
         self.election_list = [self.thisRouter]
         for i in range(len(NEIGHBORS_A_ID)):
             self.election_list.append(
                 NetworkInterface._ElectionMember(
-                    NEIGHBORS_A_ID[i],
-                    NEIGHBORS_A_PRIORITIES[i],
-                    NEIGHBORS_A_ADDRESSES[i],
-                    "0.0.0.0",
-                    "0.0.0.0")
+                    router_id=NEIGHBORS_A_ID[i],
+                    priority=NEIGHBORS_A_PRIORITIES[i],
+                    ip_address=NEIGHBORS_A_ADDRESSES[i],
+                    designated_router="0.0.0.0",
+                    backup_router="0.0.0.0")
             )
 
     def tearDown(self):
@@ -43,11 +43,11 @@ class TestElection_SubElections(unittest.TestCase):
     def test_backup_election_one_declared(self):
         self.election_list.append(
             NetworkInterface._ElectionMember(
-                5,
-                1,
-                "192.168.0.5",
-                "0.0.0.0",
-                "192.168.0.5"))
+                router_id=5,
+                priority=1,
+                ip_address="192.168.0.5",
+                designated_router="0.0.0.0",
+                backup_router="192.168.0.5"))
         backup_result = self.interface._elect_backup(self.election_list)
         self.assertIsNotNone(backup_result,
                              "Backup election returned None when it shouldn't have")
@@ -55,4 +55,64 @@ class TestElection_SubElections(unittest.TestCase):
                           "Router declaring itself as backup not elected as backup.")
         
     def test_backup_election_two_declared(self):
-        pass
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=5,
+                priority=1,
+                ip_address="192.168.0.5",
+                designated_router="0.0.0.0",
+                backup_router="192.168.0.5"))
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=6,
+                priority=10,
+                ip_address="192.168.0.6",
+                designated_router="0.0.0.0",
+                backup_router="192.168.0.6"))
+
+        backup_result = self.interface._elect_backup(self.election_list)
+        self.assertIsNotNone(backup_result,
+                             "Backup election returned None when it shouldn't have")
+        self.assertEqual(backup_result.ip_address, "192.168.0.6",
+                          "Router with highest priority declaring itself as backup not elected as backup.")
+    
+    def test_designated_election_none_declared(self):
+        election_result = self.interface._elect_designated(self.election_list)
+        self.assertIsNone(election_result,
+                          "DR election elected a router even though none declared itself as DR")
+    
+    def test_designated_election_one_declared(self):
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=5,
+                priority=1,
+                ip_address="192.168.0.5",
+                designated_router="192.168.0.5",
+                backup_router="0.0.0.0"))
+        election_result = self.interface._elect_designated(self.election_list)
+        self.assertIsNotNone(election_result,
+                             "Designated election returned None when it shouldn't have")
+        self.assertEqual(election_result.ip_address, "192.168.0.5",
+                          "Router declaring itself as DR not elected as DR.")
+    
+    def test_designated_election_two_declared(self):
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=5,
+                priority=1,
+                ip_address="192.168.0.5",
+                designated_router="192.168.0.5",
+                backup_router="0.0.0.0"))
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=6,
+                priority=10,
+                ip_address="192.168.0.6",
+                designated_router="192.168.0.6",
+                backup_router="0.0.0.0"))
+        election_result = self.interface._elect_designated(self.election_list)
+        self.assertIsNotNone(election_result,
+                             "Designated election returned None when it shouldn't have")
+        self.assertEqual(election_result.ip_address, "192.168.0.6",
+                          "Router with highest priority declaring itself as DR not elected as DR.")
+
