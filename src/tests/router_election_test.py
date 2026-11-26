@@ -160,4 +160,37 @@ class TestElection_FullElections(unittest.TestCase):
                          "Election failed to select DR")
         self.assertNotEqual(self.interface.get_backup_router(), "0.0.0.0",
                          "Election failed to select BDR")
+        self.assertEqual(self.interface.get_designated_router(), THIS_ROUTER_ADDRESS,
+                         "This router not selected as DR even though highest priority.")
+        self.assertNotEqual(self.interface.get_designated_router(),
+                            self.interface.get_backup_router(),
+                            "Election resulted in this router being DR and BDR.")
+    
+    def test_election_result_two_rounds_different_dr_and_bdr(self):
+        self.interface._run_election()
+        # Since none of the neighbors (or thisRouter) in our test set declare
+        # themselves as the DR or BDR, the first election run WILL result in
+        # the DR and BDR being the same. This is the result in all nodes
+        # *except* the node that is selected as the DR and BDR by the algorithm:
+        # it will instead select some other node as the BDR.
+        # Since it's BDR is by necessity not itself, this will NOT affect the
+        # election results of any other nodes, as by this point the node
+        # selected as BDR by the node discovering itself to be the DR has
+        # not selected ITSELF as the BDR. We can therefore slightly 
+        # misrepresent what the node that selected itself as DR will report
+        # as the BDR for our test run.
+        
+        # We pretend the neighbors ran the election. We assume they had the
+        # same information we had, which would result in them getting the
+        # same results. We also pretend we then get Hello Packets from them
+        # which update our understanding of their current DR/BDR
+        for neighbor in self.interface._neighbors:
+            neighbor.set_designated_router(self.interface.get_designated_router())
+            neighbor.set_backup_router(self.interface.get_backup_router())
+        
+        # We now re-run the election with the new DR/BDR info
+        self.interface._run_election()
+        self.assertNotEqual(self.interface.get_designated_router(),
+                            self.interface.get_backup_router(),
+                            "Election resulted in same DR and BDR after update!")
         
