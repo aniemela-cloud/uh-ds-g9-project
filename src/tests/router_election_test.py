@@ -1,6 +1,6 @@
 import unittest
 from modules.router_interface import NetworkInterface
-from modules.router_neighbor import Neighbor
+from modules.router_neighbor import Neighbor, NeighborState
 
 THIS_ROUTER_ID = 1
 THIS_ROUTER_ADDRESS = "192.168.0.1"
@@ -130,3 +130,26 @@ class TestElection_SubElections(unittest.TestCase):
         self.assertNotEqual(backup_result.ip_address, "192.168.0.5",
                           "Router declaring itself as DR also elected as backup.")
 
+class TestElection_FullElections(unittest.TestCase):
+    def setUp(self):
+        self.interface = NetworkInterface(THIS_ROUTER_ID)
+        self.interface.set_address(THIS_ROUTER_ADDRESS,"255.255.255.0")
+        self.interface.set_router_priority(1)
+        for i in range(len(NEIGHBORS_A_ID)):
+            neighbor = Neighbor(NEIGHBORS_A_ID[i])
+            neighbor.set_address(NEIGHBORS_A_ADDRESSES[i])
+            neighbor.set_priority(NEIGHBORS_A_PRIORITIES[i])
+            neighbor.set_neighbor_state(NeighborState.TWO_WAY)
+            # designated router and backup DR are left as "0.0.0.0"
+            self.interface._neighbors.append(neighbor)
+
+    def tearDown(self):
+        pass
+    
+    def test_election_has_results(self):
+        self.interface._run_election()
+        self.assertIsNot(self.interface.get_designated_router(), "0.0.0.0",
+                         "Election failed to select DR")
+        self.assertIsNot(self.interface.get_backup_router(), "0.0.0.0",
+                         "Election failed to select BDR")
+     

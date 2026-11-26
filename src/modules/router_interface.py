@@ -436,13 +436,13 @@ class NetworkInterface:
                 continue
             # Skip if the router priority indicates the neighbor does not
             # want to be a (B)DR
-            if member.get_router_priority() == 0:
+            if member.get_priority() == 0:
                 continue
             # Otherwise the neighbor is eligible, and we add it to the
             # list:
             valid_list.append(
                 self._ElectionMember(member.get_neighbor_id(),
-                                member.get_router_priority(),
+                                member.get_priority(),
                                 member.get_address(),
                                 member.get_designated_router(),
                                 member.get_backup_router()))
