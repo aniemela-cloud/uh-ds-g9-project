@@ -115,4 +115,18 @@ class TestElection_SubElections(unittest.TestCase):
                              "Designated election returned None when it shouldn't have")
         self.assertEqual(election_result.ip_address, "192.168.0.6",
                           "Router with highest priority declaring itself as DR not elected as DR.")
+    
+    def test_backup_high_priority_designated(self):
+        self.election_list.append(
+            NetworkInterface._ElectionMember(
+                router_id=5,
+                priority=100,
+                ip_address="192.168.0.5",
+                designated_router="192.168.0.5",
+                backup_router="0.0.0.0"))
+        backup_result = self.interface._elect_backup(self.election_list)
+        self.assertIsNotNone(backup_result,
+                             "Backup election returned None when it shouldn't have")
+        self.assertNotEqual(backup_result.ip_address, "192.168.0.5",
+                          "Router declaring itself as DR also elected as backup.")
 
