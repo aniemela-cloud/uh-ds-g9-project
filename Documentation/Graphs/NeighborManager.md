@@ -1,8 +1,42 @@
 # Neighbor Manager
 ## Updating Neighbors based on received Hello message
+
+## Events
+
 ```mermaid
 ---
 title: 
+---
+flowchart TB
+    style C fill:#0F0
+    style D fill:#0F0
+    style E fill:#0F0
+    style F fill:#0F0
+    style G fill:#0F0
+    A([ReceivedMessage])
+    B([Validate])
+    C([HelloReceived])
+    D([BackupSeen])
+    E([2-WayReceived])
+    F([1-WayReceived])
+    G([NeighborChange])
+    H([Kill])
+
+    A-->B
+    B-->C
+    C-->D
+    C-->E
+    E-->G
+    E-->F
+    C-->F
+```
+
+
+## Process flow
+
+```mermaid
+---
+title: Process flow
 ---
 flowchart TB
     A([ReceivedMessage])

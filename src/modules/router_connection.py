@@ -41,7 +41,7 @@ class NetworkConnection(ABC):
         """
     
     @abstractmethod
-    def get_message(self) -> (tuple, bytes):
+    def get_message(self) -> tuple[tuple, bytes]:
         """Read a message from the connection.
         
         Should only be called if check_message() indicates there is a message 
@@ -166,7 +166,7 @@ first on SocketConnection.") # Throw some error
         else:
             return False
     
-    def get_message(self) -> (tuple, bytes):
+    def get_message(self) -> tuple[tuple, bytes]:
         """Read a message from the connection.
         
         Should only be called if check_message() indicates there is a message 
