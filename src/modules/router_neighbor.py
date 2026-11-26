@@ -1,4 +1,5 @@
 from enum import Enum
+from time import time
 
 class NeighborState(Enum):
     DOWN = 0 
@@ -22,6 +23,7 @@ class Neighbor:
         self._priority = 0
         self._designated_router = "0.0.0.0"
         self._backup_designated_router = "0.0.0.0"
+        self._timer = None
 
         # Routing related (not included in our project)
         self._leader_follower = 0 # Who sends initial Routing Database Description Packet
@@ -38,10 +40,10 @@ class Neighbor:
     def get_neighbor_id(self)->int:
         return self.neighbor_id
 
-    def set_neighbor_state(self, state:int)->bool:
+    def set_neighbor_state(self, state:NeighborState)->bool:
         """Switches state"""
         try:
-            self._neighbor_state = NeighborState(state)
+            self._neighbor_state = state
             return True
         except ValueError:
             return False
@@ -89,6 +91,10 @@ class Neighbor:
 
     def get_backup_router(self)->str:
         return self._backup_designated_router
+
+    def set_timer(self)->bool:
+        self._timer = time.monotonic()
+        return True
 
     def receive_event(self, neighbor_event):
         pass

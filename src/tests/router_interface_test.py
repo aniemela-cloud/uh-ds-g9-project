@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from modules.router_interface import NetworkInterface, InterfaceState, InterfaceType
+from modules.message import HelloMessage
+from modules.router_neighbor import Neighbor, NeighborState
 
 #Notice: Requires configuration test file config/config_test.ini
 
@@ -8,6 +10,16 @@ from modules.router_interface import NetworkInterface, InterfaceState, Interface
 class TestRouterInterface(unittest.TestCase):
     def setUp(self):
         self.nw_if = NetworkInterface(10)
+        
+        self.msg_ok = HelloMessage(
+        router_id=1,
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4
+        )
+
 
     def test_invalid_id(self):
         with self.assertRaises(ValueError):
@@ -30,7 +42,7 @@ class TestRouterInterface(unittest.TestCase):
         self.assertEqual(2, self.nw_if.get_area_id())
 
     def test_valid_state(self):
-            self.nw_if.set_interface_state(6)
+            self.nw_if.set_interface_state(InterfaceState.DR)
             self.assertEqual(InterfaceState.DR, self.nw_if.get_interface_state())
 
     def test_invalid_state(self):
@@ -82,3 +94,174 @@ class TestRouterInterface(unittest.TestCase):
     def test_ivalid_backup_router(self):
         self.assertFalse(self.nw_if.set_backup_router("4"))
         self.assertFalse(self.nw_if.set_backup_router("vara"))
+
+    # def test_match_config_condition(self):
+    #     self.nw_if.new_interface(1,4,"config_test.ini", start_interface=False)
+
+    #     msg_diff_values = HelloMessage(
+    #     router_id="192.168.1.12",
+    #     area_id=2,
+    #     network_mask="255.255.255.0",
+    #     hello_interval=2,
+    #     router_priority=2,
+    #     router_dead_interval=499
+    #     )
+
+    #     self.assertTrue(self.nw_if._match_config_condition(self.msg_ok))
+    #     self.assertFalse(self.nw_if._match_config_condition(msg_diff_values))
+
+
+    def test_dr_backup_seen_condition(self):
+        msg_dr = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        designated_router= "192.168.1.12",
+        backup_designated_router= "0.0.0.0"
+        )
+        self.nw_if.set_interface_state(InterfaceState.WAITING)
+        self.assertTrue(self.nw_if._backup_seen_condition(msg_dr))
+
+    def test_bdr_backup_seen_condition(self):
+        msg_bdr = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        designated_router= "0.0.0.0",
+        backup_designated_router= "192.168.1.12"
+        )
+        self.nw_if.set_interface_state(InterfaceState.WAITING)
+        self.assertTrue(self.nw_if._backup_seen_condition(msg_bdr))
+
+    def test_bdr_backup_seen_not_waiting_condition(self):
+        msg_bdr = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        designated_router= "0.0.0.0",
+        backup_designated_router= "192.168.1.12"
+        )
+        self.nw_if.set_interface_state(InterfaceState.LOOPBACK)
+        self.assertFalse(self.nw_if._backup_seen_condition(msg_bdr))
+
+    def test_new_neighbor_condition(self):
+        #TODO fix message ip and id 
+
+        nb = Neighbor(1)
+        self.nw_if._neighbors.append(nb)
+        self.assertTrue(self.nw_if._new_neighbor_condition(self.msg_ok))
+
+    def test_not_new_neighbor_condition(self):
+        #TODO fix message ip and id 
+        nb = Neighbor(12)
+        self.nw_if._neighbors.append(nb)
+        self.assertFalse(self.nw_if._new_neighbor_condition(self.msg_ok))
+
+    def test_empty_new_neighbor_condition(self):
+        #TODO fix message ip and id 
+        self.assertFalse(self.nw_if._new_neighbor_condition(self.msg_ok))
+
+
+    def test_ok_twoway_condition(self):
+        #TODO fix message ip and id 
+        msg_nb = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        neighbors= [2,3,10]
+        )
+        self.assertTrue(self.nw_if._twoway_condition(msg_nb))
+
+    def test_nok_twoway_condition(self):
+        #TODO fix message ip and id 
+        msg_nb = HelloMessage(
+        router_id="192.168.1.12",
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        neighbors= [1,2,3]
+        )
+        self.assertFalse(self.nw_if._twoway_condition(msg_nb))
+
+    def test_priority_same_condition(self):
+        nb = Neighbor(1)
+        self.nw_if._neighbors.append(nb)
+        nb.set_priority(2)
+        self.assertTrue(self.nw_if._priority_same_condition(self.msg_ok))
+
+    # def test_leaders_same_condition(self):
+    #     #TODO fix ips and ids
+    #     msg_dr = HelloMessage(
+    #     router_id=5,
+    #     area_id=2,
+    #     network_mask="255.255.255.0",
+    #     hello_interval=2,
+    #     router_priority=2,
+    #     router_dead_interval=4,
+    #     designated_router= "192.168.1.33",
+    #     backup_designated_router= "192.168.1.11"
+    #     )
+    #     self.nw_if.set_designated_router("192.168.1.33")
+    #     self.nw_if.set_backup_router("192.168.1.11")
+    #     nb = Neighbor(5)
+    #     nb.set_designated_router="192.168.1.33"
+    #     nb.set_backup_router="192.168.1.11"
+    #     self.nw_if._neighbors.append(nb)
+
+    #     self.assertTrue(self.nw_if._leaders_same_condition(msg_dr))
+
+    def test_conflict_condition(self):
+        #TODO fix ips and ids
+        msg_dr = HelloMessage(
+        router_id=5,
+        area_id=2,
+        network_mask="255.255.255.0",
+        hello_interval=2,
+        router_priority=2,
+        router_dead_interval=4,
+        designated_router= "192.168.1.33",
+        backup_designated_router= "192.168.1.11"
+        )
+        self.nw_if.set_designated_router("192.168.1.33")
+        self.nw_if.set_backup_router("192.168.1.11")
+        self.assertTrue(self.nw_if._conflict_condition(msg_dr))
+
+
+    def test_handle_received_message(self):
+        #TODO fix message ip and id 
+        #Conditions and events are mainly tested elsewhere
+
+        #New neighbor noticed and created
+        self.nw_if.set_address("192.168.0.1", "255.255.255.0")
+        self.nw_if.set_hello_interval(2)
+        self.nw_if.set_router_priority(2)
+        self.nw_if.set_router_dead_interval(4)
+        self.nw_if._handle_received_message(self.msg_ok)
+        self.assertIn(1, self.nw_if.get_neighbor_ids())
+
+    def test_handle_backup_seen(self):
+        pass
+
+    def test_handle_twoway(self):
+        pass
+
+    def test_handle_neighbor_change(self):
+        pass
+
+    def test_handle_neighbor_dead(self):
+        pass
+
