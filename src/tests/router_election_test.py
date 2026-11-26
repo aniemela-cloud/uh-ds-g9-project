@@ -148,8 +148,16 @@ class TestElection_FullElections(unittest.TestCase):
     
     def test_election_has_results(self):
         self.interface._run_election()
-        self.assertIsNot(self.interface.get_designated_router(), "0.0.0.0",
+        self.assertNotEqual(self.interface.get_designated_router(), "0.0.0.0",
                          "Election failed to select DR")
-        self.assertIsNot(self.interface.get_backup_router(), "0.0.0.0",
+        self.assertNotEqual(self.interface.get_backup_router(), "0.0.0.0",
                          "Election failed to select BDR")
      
+    def test_this_router_elected_as_dr_but_not_bdr(self):
+        self.interface.set_router_priority(10)
+        self.interface._run_election()
+        self.assertNotEqual(self.interface.get_designated_router(), "0.0.0.0",
+                         "Election failed to select DR")
+        self.assertNotEqual(self.interface.get_backup_router(), "0.0.0.0",
+                         "Election failed to select BDR")
+        
