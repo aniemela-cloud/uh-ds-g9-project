@@ -42,6 +42,8 @@ class Neighbor:
 
     def set_neighbor_state(self, state:NeighborState)->bool:
         """Switches state"""
+        if not isinstance(state, NeighborState):
+            return False
         try:
             self._neighbor_state = state
             return True

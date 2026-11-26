@@ -20,7 +20,7 @@ class TestNeighbor(unittest.TestCase):
         self.assertEqual(2, self.nb.get_neighbor_id())
 
     def test_valid_state(self):
-            self.nb.set_neighbor_state(6)
+            self.nb.set_neighbor_state(NeighborState.LOADING)
             self.assertEqual(NeighborState.LOADING, self.nb.get_neighbor_state())
 
     def test_invalid_state(self):
