@@ -420,7 +420,7 @@ class NetworkInterface:
         if self.get_router_priority() > 0:
             # Start with this router, saving the _ElectionMember reference for 
             # later
-            thisRouter = _ElectionMember(
+            thisRouter = self._ElectionMember(
                 self.id,
                 self._router_priority,
                 self._ip_address,
@@ -432,7 +432,7 @@ class NetworkInterface:
         # Iterate through neighbors, adding eligible ones
         for member in self._neighbors:
             # Skip if the state is not at least 2-Way
-            if member.get_neighbor_state() < NeighborState.TWO_WAY:
+            if member.get_neighbor_state().value < NeighborState.TWO_WAY.value:
                 continue
             # Skip if the router priority indicates the neighbor does not
             # want to be a (B)DR
@@ -441,7 +441,7 @@ class NetworkInterface:
             # Otherwise the neighbor is eligible, and we add it to the
             # list:
             valid_list.append(
-                _ElectionMember(member.get_neighbor_id(),
+                self._ElectionMember(member.get_neighbor_id(),
                                 member.get_router_priority(),
                                 member.get_address(),
                                 member.get_designated_router(),
@@ -469,8 +469,8 @@ class NetworkInterface:
         # Check whether this router was selected as the DR through the above
         # AND that this router was NOT the DR before the calculations
         # + Same check for BDR
-        if (self.id == maybe_designated.id and current_dr != self._ip_address) or \
-            (self.id == maybe_backup.id and current_bdr != self._ip_address):
+        if (self.id == maybe_designated.router_id and current_dr != self._ip_address) or \
+            (self.id == maybe_backup.router_id and current_bdr != self._ip_address):
             if thisRouter is None:
                 raise Exception("Election error: This router was selected as the (B)DR even though this router should not be eligible.")
             # We assign the DR/BDR IP addresses to this router's _ElectionMember
