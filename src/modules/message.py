@@ -21,6 +21,8 @@ def _checksum(packet: bytes) -> int:
     return (~total) & 0xFFFF
 
 
+debug = 1 # Set to 1 for testing the sending of message
+
 @dataclass
 class HelloMessage:
     router_id: str
