@@ -11,7 +11,7 @@ class TestRouterInterface(unittest.TestCase):
     def setUp(self):
         self.nw_if = NetworkInterface(10)
         self.msg_ok = HelloMessage(
-        router_id=1,
+        router_id="192.168.1.10",
         area_id=2,
         network_mask="255.255.255.0",
         hello_interval=2,
@@ -153,25 +153,20 @@ class TestRouterInterface(unittest.TestCase):
         self.assertFalse(self.nw_if._backup_seen_condition(msg_bdr))
 
     def test_new_neighbor_condition(self):
-        #TODO fix message ip and id 
-
-        nb = Neighbor(1)
-        self.nw_if._neighbors.append(nb)
         self.assertTrue(self.nw_if._new_neighbor_condition(self.msg_ok))
 
     def test_not_new_neighbor_condition(self):
-        #TODO fix message ip and id 
-        nb = Neighbor(12)
+        """Old known neighbor"""
+        nb = Neighbor("192.168.1.10")
         self.nw_if._neighbors.append(nb)
-        self.assertFalse(self.nw_if._new_neighbor_condition(self.msg_ok))
+        self.assertTrue(self.nw_if._new_neighbor_condition(self.msg_ok))
 
     def test_empty_new_neighbor_condition(self):
-        #TODO fix message ip and id 
-        self.assertFalse(self.nw_if._new_neighbor_condition(self.msg_ok))
+        """Interface has no neighbors yet"""
+        self.assertTrue(self.nw_if._new_neighbor_condition(self.msg_ok))
 
 
     def test_ok_twoway_condition(self):
-        #TODO fix message ip and id 
         msg_nb = HelloMessage(
         router_id="192.168.1.12",
         area_id=2,
@@ -179,12 +174,12 @@ class TestRouterInterface(unittest.TestCase):
         hello_interval=2,
         router_priority=2,
         router_dead_interval=4,
-        neighbors= [2,3,10]
+        neighbors= ["192.168.1.1", "192.168.1.4"]
         )
+        self.nw_if.set_address("192.168.1.1", "255.255.255.0")
         self.assertTrue(self.nw_if._twoway_condition(msg_nb))
 
     def test_nok_twoway_condition(self):
-        #TODO fix message ip and id 
         msg_nb = HelloMessage(
         router_id="192.168.1.12",
         area_id=2,
@@ -192,18 +187,18 @@ class TestRouterInterface(unittest.TestCase):
         hello_interval=2,
         router_priority=2,
         router_dead_interval=4,
-        neighbors= [1,2,3]
+        neighbors= []
         )
+        self.nw_if.set_address("192.168.1.1", "255.255.255.0")
         self.assertFalse(self.nw_if._twoway_condition(msg_nb))
 
     def test_priority_same_condition(self):
-        nb = Neighbor(1)
+        nb = Neighbor("192.168.1.10")
         self.nw_if._neighbors.append(nb)
         nb.set_priority(2)
         self.assertTrue(self.nw_if._priority_same_condition(self.msg_ok))
 
     # def test_leaders_same_condition(self):
-    #     #TODO fix ips and ids
     #     msg_dr = HelloMessage(
     #     router_id=5,
     #     area_id=2,
@@ -224,9 +219,8 @@ class TestRouterInterface(unittest.TestCase):
     #     self.assertTrue(self.nw_if._leaders_same_condition(msg_dr))
 
     def test_conflict_condition(self):
-        #TODO fix ips and ids
         msg_dr = HelloMessage(
-        router_id=5,
+        router_id="192.168.1.10",
         area_id=2,
         network_mask="255.255.255.0",
         hello_interval=2,
@@ -241,7 +235,6 @@ class TestRouterInterface(unittest.TestCase):
 
 
     def test_handle_received_message(self):
-        #TODO fix message ip and id 
         #Conditions and events are mainly tested elsewhere
 
         #New neighbor noticed and created
@@ -250,7 +243,7 @@ class TestRouterInterface(unittest.TestCase):
         self.nw_if.set_router_priority(2)
         self.nw_if.set_router_dead_interval(4)
         self.nw_if._handle_received_message(self.msg_ok)
-        self.assertIn(1, self.nw_if.get_neighbor_ids())
+        self.assertIn("192.168.1.10", self.nw_if.get_neighbor_ids())
 
     def test_handle_backup_seen(self):
         msg_dr = HelloMessage(
@@ -269,13 +262,13 @@ class TestRouterInterface(unittest.TestCase):
         self.assertIn(3, self.nw_if.get_neighbor_ids())
 
     def test_handle_twoway(self):
-        nb = Neighbor(1)
+        nb = Neighbor("192.168.1.10")
         self.nw_if._neighbors.append(nb)
         self.nw_if._handle_twoway(self.msg_ok)
         self.assertEqual(nb.get_neighbor_state(), NeighborState.TWO_WAY)
 
     def test_handle_neighbor_change(self):
-        nb = Neighbor(1)
+        nb = Neighbor("192.168.1.10")
         self.nw_if._neighbors.append(nb)
         self.assertEqual(nb.get_neighbor_id(),self.msg_ok.router_id)
         self.nw_if._handle_neighbor_change(self.msg_ok)

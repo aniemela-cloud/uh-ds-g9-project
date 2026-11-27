@@ -1,6 +1,8 @@
 from enum import Enum
 import time
 
+debug = 1 #For debuging set to 1
+
 class NeighborState(Enum):
     DOWN = 0 
     ATTEMPT = 1
@@ -14,10 +16,10 @@ class NeighborState(Enum):
 
 class Neighbor:
     def __init__(self, given_id):
-        try:
-            self.neighbor_id = int(given_id)
-        except ValueError:
-            raise ValueError("ID must be an integer")
+        if not given_id:
+            raise ValueError("Neighbor id cannot be empty")
+        self.neighbor_id = given_id
+
         self._neighbor_state= NeighborState.INIT
         self._ip_address = "0.0.0.0"
         self._priority = 0
@@ -33,11 +35,11 @@ class Neighbor:
 
     def new_neighbor(self, ip_address):
         if self.set_address(ip_address):
-            print("Neighbor: New neighbor created, id:", self.neighbor_id, "IP:", self._ip_address)
+            if debug: print("Neighbor IP set:", self._ip_address)
             return True
         return False
 
-    def get_neighbor_id(self)->int:
+    def get_neighbor_id(self)->str:
         return self.neighbor_id
 
     def set_neighbor_state(self, state:NeighborState)->bool:

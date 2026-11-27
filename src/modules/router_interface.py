@@ -89,8 +89,9 @@ class NetworkInterface:
         self._designated_router = "0.0.0.0"
         self._backup_designated_router = "0.0.0.0"
 
-        self.next_neighbor_id = 1
         self._neighbors = [] #List of neighbor instances NOT READY
+        self._counter = 0
+
 
     def new_interface(self, interface_type:int, ip_version:int, config_file:str, start_interface=False):
         """Method reads configuration data from given file and 
@@ -344,6 +345,7 @@ class NetworkInterface:
                         # either DR, DR_OTHER, or Backup
 
                         #Before election, this changes to next status
+                        #TODO debug
                         if debug: self.set_interface_state(InterfaceState.DROTHER)
                         pass
 
@@ -352,6 +354,7 @@ class NetworkInterface:
                         self._hello_timer = time.monotonic() + self._hello_interval
 
                 case InterfaceState.DROTHER | InterfaceState.BACKUP | InterfaceState.DR:
+                    if debug: print("Looping normal operation")
                     # First, we send out hello if the interval has expired
                     if time.monotonic() >= self._hello_timer:
                         if debug: print("Time to send a hello...")
@@ -363,20 +366,27 @@ class NetworkInterface:
                             break #Stop to send only one message
 
                     # Second, we take in one message if there are any
-                    if self._networkconnection.check_message():
-                    #    process_message(socket.get_message)
-                    # Status can change based on processing
-                        pass 
+                    #TODO Activate counter when you have more than 1 msg coming
+                    if self._networkconnection.check_message():# and (self._counter<3):
+                        if debug: print("Receiving hellos")
+                        self._receive_hello()
+                        self._counter += 1
+                    else:
+                        if debug: print("No hello messages in socket")
+                        self._counter = 0
 
-                        #Third, we check if any neighbor has died
-                        for nb in self._neighbors:
+                    #Third, we check if any neighbor has died
+                    if debug: print("Check dead neighbors")
+                    for nb in self._neighbors:
+                        #TODO
                         #    neighbor.check_wait_timer
-                            pass
+                        #Ready to read more messages
+                        self._counter = 0
 
                     #if no messages, sleep for a second
                     else:
                         if debug: print("Sleeping")
-                        time.sleep(10)
+                        time.sleep(2)
 
                 case _:
                     raise Exception("Interface is stateless")
@@ -393,22 +403,27 @@ class NetworkInterface:
 
     def receive_event(self, interface_event, message=None):
         """Actions based on events"""
-        if debug: print("\nEvent starts")
-        if interface_event=="HelloReceived":
-            self._handle_received_message(message)
-        elif interface_event=="BackupSeen":
-            self._handle_backup_seen(message)
-        elif interface_event=="2-WayReceived":
-            self._handle_twoway(message)
-        elif interface_event=="1-WayReceived":
-            self._handle_oneway(message)
-        elif interface_event=="NeighborChange":
-            self._handle_neighbor_change(message)
-        elif interface_event=="KillNbr":
-            self._handle_neighbor_dead()
+        if debug: print("\nEvent starts", interface_event, "counter:", self._counter)
+        if self._counter < 4:
+            if interface_event=="HelloReceived":
+                self._handle_received_message(message)
+            elif interface_event=="BackupSeen":
+                self._handle_backup_seen(message)
+            elif interface_event=="2-WayReceived":
+                self._handle_twoway(message)
+            elif interface_event=="1-WayReceived":
+                self._handle_oneway(message)
+                if debug: print("1way over")
+            elif interface_event=="NeighborChange":
+                self._handle_neighbor_change(message)
+            elif interface_event=="KillNbr":
+                self._handle_neighbor_dead()
+            else:
+                raise Exception("Unknown Interface Event")
+            self._counter += 1
         else:
-            raise Exception("Unknown Interface Event")
-        if debug: print("End of event.")
+            return False
+        if debug: print("End of event:", interface_event)
 
 # Conditions for MESSAGE processing
 
@@ -428,12 +443,11 @@ class NetworkInterface:
 
     def _new_neighbor_condition(self, message:HelloMessage) -> bool:
         """Validates if Hello message has a new (unknown) neighbor ID"""
-        return message.router_id in self.get_neighbor_ids()
+        return message.router_id not in self.get_neighbors()
 
     def _twoway_condition(self, message:HelloMessage) -> bool:
         """Validates if this interface is included on neighbors list"""
-        #TODO IP or ID?
-        return self.id in message.neighbors
+        return self._ip_address in message.neighbors
 
     def _priority_same_condition(self, message):
         """Validates if priority has changed"""
@@ -469,25 +483,28 @@ class NetworkInterface:
             self.receive_event("BackUpSeen", message)
 
         # Is the neighbor ID from new previously unknown router
-        if self._new_neighbor_condition(message) or not self._neighbors:
+        if self._new_neighbor_condition(message):
             # Create new neighbor
-            if debug: print("New neighbor detected")
+            if debug: print("New neighbor detected", message.router_id, message.designated_router)
             nb = Neighbor(message.router_id)
             self._neighbors.append(nb)
-            if debug: print("\tNeigbor created.")
+            if debug: print("\tNeighbor created.")
 
             # Does it know this inteface or not
             if self._twoway_condition(message):
-                if debug: print("Trigger 2-WAY")
+                if debug: print("Trigger 2-WAY event")
                 self.receive_event("2-WayReceived", message)
             else:
-                if debug: print("Trigger 1-WAY")
+                if debug: print("Trigger 1-WAY event")
                 self.receive_event("1-WayReceived", message)
+                #TODO goes where
             if debug: print("End of trigger")
+            #TODO does new nb need to trigger neighbor change?
+            if debug: print("Trigger NeighborChange from new neighbor")
             self.receive_event("NeighborChange", message)
 
         else:
-            if debug: print("OLD neighbor detected", self._new_neighbor_condition(message))
+            if debug: print("OLD neighbor detected")
 
             #This is a known neighbor
             nb = self.get_neighbor(message.router_id)
@@ -495,27 +512,30 @@ class NetworkInterface:
             # Does it know this inteface or not
             #TODO this repeats bc has to be done before other updates
             if self._twoway_condition(message):
-                if debug: print("TRIGGER 2-WAY")
+                if debug: print("TRIGGER 2-WAY event (old nb)")
                 self.receive_event("2-WayReceived", message)
             else:
-                if debug: print("TRIGGER 1-WAY")
+                if debug: print("TRIGGER 1-WAY event (old nb)")
                 self.receive_event("1-WayReceived", message)
 
             #Has its priority changed
             if not self._priority_same_condition(message):
+                if debug: print("TRIGGER NeigborChange (old nb), priority")
                 self.receive_event("NeighborChange", message)
 
             #Has it been DR/BDR and is not anymore, or is now declaring to be
             elif not self._leaders_same_condition(message):
+                if debug: print("TRIGGER NeigborChange (old nb), leader change")
                 self.receive_event("NeighborChange", message)
 
             #Does it have other DR/BDR than in this interface
             elif self._conflict_condition(message):
+                if debug: print("TRIGGER NeigborChange (old nb), conflict")
                 self.receive_event("NeighborChange", message)
 
             #Nothing has changed, just update timer
-            self._update_neighbor_timer()
-        if debug: print("End of handling")
+            nb.set_timer()
+        if debug: print("End of handling received message")
 
 
     def _handle_backup_seen(self, message:HelloMessage):
@@ -534,11 +554,11 @@ class NetworkInterface:
         """Updating changed neighbor data and triggering election"""
         if debug: print("Neighbor change starts")
         nb = self.get_neighbor(message.router_id)
+        print("Neighbor instance found? ", nb.get_neighbor_id())
         if not isinstance(nb, Neighbor):
             raise Exception("Non-existing neighbor.")
         if nb.get_address() == "0.0.0.0":
             #New neighbor
-            #TODO change ip
             nb.new_neighbor(message.router_id)
         #Update data
         nb.set_priority(message.router_priority)
@@ -559,20 +579,16 @@ class NetworkInterface:
         return False
 
     def _handle_oneway(self, message):
+        if debug: print("Handling 1-way")
         nb = self.get_neighbor(message.router_id)
-        print("Neighbor", self.get_neighbor_ids(), message.router_id)
         if nb.set_neighbor_state(NeighborState.INIT):
+            if debug: print("State set to INIT")
             return True
         return False
 
     def _handle_neighbor_dead():
         #TODO not implemented yet
         pass
-
-    def _update_neighbor_timer(neighbor:Neighbor):
-        if neighbor.set_timer():
-            return True
-        return False
 
     #Methods for Hello messages
 
@@ -583,12 +599,12 @@ class NetworkInterface:
         message_bytes = message.to_bytes()
         self._networkconnection.send_message((self._destination_ip,self._port), message_bytes)
 
-    def _receive_hello(self, connection):
+    def _receive_hello(self):
         """Based on received message
         creates a neighbor or updates an old"""
-        if not connection.check_message():
+        if not self._networkconnection.check_message():
             return
-        message_bytes, sender_address = connection.get_message()
+        message_bytes, sender_address = self._networkconnection.get_message()
         message = HelloMessage.from_bytes(message_bytes)
         if (message.message_type == 1):
             self.receive_event("HelloReceived", message)
