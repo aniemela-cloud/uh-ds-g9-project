@@ -126,13 +126,14 @@ connecting first on SocketConnection.") # Throw some error
         # Get the IP address this SocketConnection is bound to
         my_addr, my_port = self._sock.getsockname()
         # Turn the string dot notation addresses into a byte representation
-        multi_addr_bytes = socket.inet.aton(multicast_addr)
-        my_addr_bytes = socket.inet.aton(my_addr)
+        multi_addr_bytes = socket.inet_aton(multicast_addr)
+        my_addr_bytes = socket.inet_aton(my_addr)
         # Pack the byte representation addresses into a struct, plus a 0 to 
         # indicate "any interface index".
         # See https://manpages.debian.org/trixie/manpages/ip.7.en.html#IP_ADD_MEMBERSHIP
         # for further information.
-        opt_struct = struct.pack('=4s4sl', multi_addr_bytes, my_addr_bytes, 0)
+#        opt_struct = struct.pack('=4s4sl', multi_addr_bytes, my_addr_bytes, 0)
+        opt_struct = struct.pack('4sl', multi_addr_bytes, socket.INADDR_ANY)
         self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, 
                               opt_struct)
         # We'll probably be sending to the multicast group, too, so we'll set
@@ -148,6 +149,7 @@ connecting first on SocketConnection.") # Throw some error
         get_message(), or False if calling get_message() would block.
         Raises an exception if the underlying socket has not been connected.
         """
+        print("CONN")
         if self._sock is None:
             raise Exception("Attempted to check message without connecting \
 first on SocketConnection.") # Throw some error
@@ -155,6 +157,8 @@ first on SocketConnection.") # Throw some error
         # use select.select() to check if our sock is ready for reading
         # timeout value of 0 polls instead of blocking. 
         s_result = select.select([self._sock],[],[],0)
+        print("CONN2")
+
         if s_result is None or type(s_result) is not tuple:
             raise Exception(
                 "Got a malformed result when using select on socket")
@@ -162,8 +166,12 @@ first on SocketConnection.") # Throw some error
         # in the list that is the first member of the 3-tuple returned
         # by select.select()
         if len(s_result[0]) > 0:
+            print("CONN3")
+
             return True
         else:
+            print("CONN4")
+
             return False
     
     def get_message(self) -> tuple[tuple, bytes]:

@@ -1,6 +1,5 @@
 #EXAMPLE USE:
-#python3 receiver.py -mc_address 224.0.2.15:65435
-
+#python3 tests/socket_receiving_multicast_test.py -mc_address 224.0.2.15:65435
 import struct
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM, inet_aton, IPPROTO_IP, \

@@ -7,7 +7,7 @@ import ipaddress
 from modules.router_neighbor import Neighbor, NeighborState
 from modules.router_connection import SocketConnection
 
-debug = 1 #Set to 1 for debugging 
+debug = 1 #Set to 1 for debugging
 
 class InterfaceType(Enum):
     POINTTOPOINT = 1
@@ -320,7 +320,8 @@ class NetworkInterface:
                     if not self._networkconnection.connect_network((self.get_address(),self._port)):
                         ### Something went badly wrong
                         raise Exception("oh no the network did not connect")
-                    
+
+                    self._networkconnection.join_multicast(self._destination_ip) 
                     self.set_interface_state(InterfaceState.WAITING)
                     self._wait_timer = time.monotonic() + self._router_dead_interval
 
@@ -331,23 +332,28 @@ class NetworkInterface:
                     pass
 
                 case InterfaceState.WAITING:
+
+                    # Check if wait timer has expired
+                    if time.monotonic() >= self._wait_timer:
+                        # the run_election_stuff will assign us a state
+                        # either DR, DR_OTHER, or Backup
+                        #Before election, this changes to next status
+                        self.set_interface_state(InterfaceState.DROTHER)
+                        self._wait_timer = None
+                    else:
                     # Get messages
-                    #TODO if socket.check_messages:
                         # Received message 
                         # if it includes DR/BAckup changes status to DROTHER
                         # Or it runs election which changes status to
                         # either DR, DR_OTHER, or Backup
-
-                    # Check if wait timer has expired
-                    if time.monotonic() >= self._wait_timer:
-                        #TODO run election
-                        # the run_election_stuff will assign us a state
-                        # either DR, DR_OTHER, or Backup
-
-                        #Before election, this changes to next status
-                        #TODO debug
-                        if debug: self.set_interface_state(InterfaceState.DROTHER)
-                        pass
+                        if debug: print("Starting neworking waiting")
+                        if self._networkconnection.check_message():# and (self._counter<3):
+                            if debug: print("Receiving hellos while waiting")
+                            self._receive_hello()
+                            self._counter += 1
+                        else:
+                            if debug: pass#print("No hello messages in socket")
+                            self._counter = 0
 
                     #In case state changed, initialize Hello timer
                     if self._interface_state != InterfaceState.WAITING:
