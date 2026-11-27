@@ -1,4 +1,7 @@
 from enum import Enum
+import time
+
+debug = 1 #For debuging set to 1
 
 class NeighborState(Enum):
     DOWN = 0 
@@ -13,15 +16,16 @@ class NeighborState(Enum):
 
 class Neighbor:
     def __init__(self, given_id):
-        try:
-            self.neighbor_id = int(given_id)
-        except ValueError:
-            raise ValueError("ID must be an integer")
+        if not given_id:
+            raise ValueError("Neighbor id cannot be empty")
+        self.neighbor_id = given_id
+
         self._neighbor_state= NeighborState.INIT
         self._ip_address = "0.0.0.0"
         self._priority = 0
         self._designated_router = "0.0.0.0"
         self._backup_designated_router = "0.0.0.0"
+        self._timer = None
 
         # Routing related (not included in our project)
         self._leader_follower = 0 # Who sends initial Routing Database Description Packet
@@ -31,17 +35,19 @@ class Neighbor:
 
     def new_neighbor(self, ip_address):
         if self.set_address(ip_address):
-            print("New neighbor created, id:", self.neighbor_id, "IP:", self._ip_address)
+            if debug: print("Neighbor IP set:", self._ip_address)
             return True
         return False
 
-    def get_neighbor_id(self)->int:
+    def get_neighbor_id(self)->str:
         return self.neighbor_id
 
-    def set_neighbor_state(self, state:int)->bool:
+    def set_neighbor_state(self, state:NeighborState)->bool:
         """Switches state"""
+        if not isinstance(state, NeighborState):
+            return False
         try:
-            self._neighbor_state = NeighborState(state)
+            self._neighbor_state = state
             return True
         except ValueError:
             return False
@@ -89,6 +95,10 @@ class Neighbor:
 
     def get_backup_router(self)->str:
         return self._backup_designated_router
+
+    def set_timer(self)->bool:
+        self._timer = time.monotonic()
+        return True
 
     def receive_event(self, neighbor_event):
         pass
